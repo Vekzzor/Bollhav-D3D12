@@ -3,6 +3,7 @@
 #endif 
 
 #include <windows.h>
+#include "Renderer.h"
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -42,6 +43,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 	}
 
 	ShowWindow(hwnd, nCmdShow);
+
+	////////////////////////////TEMP, MIGHT BE STORED SOMEWHERE ELSE LATER/////////////////////////////////
+	Renderer DX12Renderer; 
+	DX12Renderer.init(640.0f, 480.0f, hwnd); 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// Run the message loop.
 

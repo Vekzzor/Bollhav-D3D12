@@ -21,9 +21,15 @@
     <ClCompile Include="ObjLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\..\Programmerings test\DirectX12\DirectX12-test\DX12Test\DX12Test\Renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ObjLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\Programmerings test\DirectX12\DirectX12-test\DX12Test\DX12Test\Renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

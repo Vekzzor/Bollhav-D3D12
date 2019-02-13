@@ -1,0 +1,67 @@
+#pragma once
+#include <d3d12.h>
+#include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
+#include <d3dcompiler.h>
+
+#pragma comment (lib, "d3d12.lib")
+#pragma comment (lib, "DXGI.lib")
+#pragma comment (lib, "d3dcompiler.lib")
+
+static const UINT NUMOFBUFFERS = 2; 
+
+class Renderer
+{
+private:
+
+	template<class Interface>
+	inline void SafeRelease(
+		Interface **ppInterfaceToRelease)
+	{
+		if (*ppInterfaceToRelease != NULL)
+		{
+			(*ppInterfaceToRelease)->Release();
+
+			(*ppInterfaceToRelease) = NULL;
+		}
+	}
+
+	IDXGIFactory6* m_factory = nullptr;
+	ID3D12Device4* m_device4 = nullptr; 
+	ID3D12CommandQueue* m_commandQueue = nullptr; 
+	ID3D12CommandAllocator* m_commandAllocator = nullptr;
+	ID3D12GraphicsCommandList3* m_commandList = nullptr;
+	IDXGISwapChain1* m_swapChain1 = nullptr; 
+	IDXGISwapChain4* m_swapChain4 = nullptr;
+	ID3D12DescriptorHeap* m_renderTargetsHeap = nullptr; 
+	ID3D12Resource1* m_renderTargetViews[NUMOFBUFFERS] = {};
+	ID3D12RootSignature* m_rootSignature; 
+	UINT m_renderTargetDescSize = 0;
+
+	//Make use of this in the right way, the way it is used 
+	//now is not correct. 
+	ID3D12Fence1* m_fence1 = nullptr; 
+	UINT m_fenceValue; 
+	HANDLE m_eventHandle; 
+
+	D3D12_VIEWPORT m_viewPort; 
+	D3D12_RECT m_scissorRect; 
+
+	UINT m_width; 
+	UINT m_height;
+	
+
+public:
+	Renderer(); 
+	~Renderer(); 
+	
+	void init(const UINT wWidth, const UINT wHeight, HWND& wndHandle);
+
+	void CreateDevice(); 
+	void CreateSwapChainAndCommandIterface(HWND& whand); 
+	void CreateFenceAndEventHadle(); 
+	void CreateRenderTarget(); 
+	void CreateViewportAndScissorRect(); 
+	void CreateRootSignature(); 
+
+
+};
