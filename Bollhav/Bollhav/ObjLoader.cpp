@@ -21,29 +21,29 @@ bool OBJLoader::loadObj(char * path,
 	{
 		char type[128]; 
 
-		while (!objFile.eof)
+		while (!objFile.eof())
 		{
 			objFile >> type; 
 
 			if (type == "v")
 			{
-				XMFLOAT3A vertex; 
+				XMFLOAT3A vertex = {};
 
 				/*fscanf: Which file are we reading from, read 3 (or 2) floats, where shall the data be stored*/
 
-				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z); 
+				fscanf_s(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z); 
 				m_vertices.push_back(vertex); 
 			}
 			else if (type == "vt")
 			{
-				XMFLOAT2A uv; 
-				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f\n", &uv.x, &uv.y); 
+				XMFLOAT2A uv = {};
+				fscanf_s(dynamic_cast<FILE*>(&objFile), "%f %f\n", &uv.x, &uv.y); 
 				m_uvs.push_back(uv); 
 			}
 			else if(type == "vn")
 			{
-				XMFLOAT3A normal; 
-				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", normal.x, normal.y, normal.z);
+				XMFLOAT3A normal = {};
+				fscanf_s(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", normal.x, normal.y, normal.z);
 				m_normals.push_back(normal); 
 			}
 			else if (type == "f")
@@ -55,7 +55,7 @@ bool OBJLoader::loadObj(char * path,
 				fscanf returns the amount of succesfully converted and assigned fields; meaning that if
 				we do not get 9 matches, the data is faulty.*/
 
-				int matches = fscanf(dynamic_cast<FILE*>(&objFile), "%d/%d/%d %d/%d/%d %d/%d/%d\n",
+				int matches = fscanf_s(dynamic_cast<FILE*>(&objFile), "%d/%d/%d %d/%d/%d %d/%d/%d\n",
 					&vertexIndex[0], &uvIndex[0], &normalIndex[0],
 					&vertexIndex[1], &uvIndex[1], &normalIndex[1],
 					&vertexIndex[2], &uvIndex[2], &normalIndex[2]);
