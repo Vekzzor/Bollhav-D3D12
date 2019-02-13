@@ -13,7 +13,7 @@ OBJLoader::~OBJLoader()
 {
 }
 
-OBJLoader::CURRENT_VALUES OBJLoader::loadObj(char * path)
+CURRENT_VALUES OBJLoader::loadObj(char * path)
 {
 	std::ifstream objFile; 
 	objFile.open(path); 

@@ -10,23 +10,22 @@
 
 using namespace DirectX; 
 
+
+struct CURRENT_VALUES
+{
+	std::vector<unsigned int> vertexIndices = {};
+	std::vector<unsigned int> uvIndices = {};
+	std::vector<unsigned int> normalIndices = {};
+	std::vector<XMFLOAT3A> out_vertices = {};
+	std::vector<XMFLOAT2A> out_uvs = {};
+	std::vector<XMFLOAT3A> out_normals = {};
+	std::string status = "";
+};
+
 class OBJLoader
 {
 private: 
-
-	struct CURRENT_VALUES
-	{
-		std::vector<unsigned int> vertexIndices = {};
-		std::vector<unsigned int> uvIndices = {};
-		std::vector<unsigned int> normalIndices = {};
-		std::vector<XMFLOAT3A> out_vertices = {};
-		std::vector<XMFLOAT2A> out_uvs = {};
-		std::vector<XMFLOAT3A> out_normals = {};
-		std::string status = ""; 
-	};
-
 	CURRENT_VALUES m_currentValues = {}; 
-
 public:
 	OBJLoader(); 
 	~OBJLoader(); 
