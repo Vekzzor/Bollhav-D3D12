@@ -32,19 +32,19 @@ bool OBJLoader::loadObj(char * path,
 				/*fscanf: Which file are we reading from, read 3 (or 2) floats, where shall the data be stored*/
 
 				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z); 
-				m_tempVertices.push_back(vertex); 
+				m_vertices.push_back(vertex); 
 			}
 			else if (type == "vt")
 			{
 				XMFLOAT2A uv; 
 				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f\n", &uv.x, &uv.y); 
-				m_tempUVs.push_back(uv); 
+				m_uvs.push_back(uv); 
 			}
 			else if(type == "vn")
 			{
 				XMFLOAT3A normal; 
 				fscanf(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", normal.x, normal.y, normal.z);
-				m_tempNormals.push_back(normal); 
+				m_normals.push_back(normal); 
 			}
 			else if (type == "f")
 			{
@@ -79,8 +79,6 @@ bool OBJLoader::loadObj(char * path,
 				m_normalIndices.push_back(normalIndex[0]);
 				m_normalIndices.push_back(normalIndex[1]);
 				m_normalIndices.push_back(normalIndex[2]);
-
-				////////////////////////////////////////////CONTINUE HERE///////////////////////////
 
 			}
 		}

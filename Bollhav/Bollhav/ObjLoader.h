@@ -15,9 +15,9 @@ class OBJLoader
 private: 
 
 	std::vector<unsigned int> m_vertexIndices, m_uvIndices, m_normalIndices; 
-	std::vector<XMFLOAT3A> m_tempVertices; 
-	std::vector<XMFLOAT2A> m_tempUVs; 
-	std::vector<XMFLOAT3A> m_tempNormals;
+	std::vector<XMFLOAT3A> m_vertices; 
+	std::vector<XMFLOAT2A> m_uvs; 
+	std::vector<XMFLOAT3A> m_normals;
 
 public:
 	OBJLoader(); 
