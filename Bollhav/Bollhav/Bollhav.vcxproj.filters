@@ -51,4 +51,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\..\..\..\Programmerings test\Referenser\190128-D3D12Demo-NoRT\D3D12Demo\PixelShader.hlsl">
+      <Filter>Source Files</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\..\..\..\Programmerings test\Referenser\190128-D3D12Demo-NoRT\D3D12Demo\VertexShader.hlsl">
+      <Filter>Source Files</Filter>
+    </FxCompile>
+  </ItemGroup>
 </Project>

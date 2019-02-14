@@ -36,6 +36,7 @@ private:
 	ID3D12Resource1* m_renderTargetViews[NUMOFBUFFERS] = {};
 	ID3D12RootSignature* m_rootSignature; 
 	UINT m_renderTargetDescSize = 0;
+	ID3D12PipelineState* m_graphPipelineState = nullptr; 
 
 	//Make use of this in the right way, the way it is used 
 	//now is not correct. 
@@ -62,6 +63,6 @@ public:
 	void CreateRenderTarget(); 
 	void CreateViewportAndScissorRect(); 
 	void CreateRootSignature(); 
-
+	void CreatePiplelineStateAndShaders(); 
 
 };
