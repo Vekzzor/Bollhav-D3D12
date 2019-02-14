@@ -1,15 +1,15 @@
 struct VSIn
 {
 	float3 pos		: POSITION;
-	float2 uv : TEXCOORD; 
 	float3 normal : NORMAL; 
+	float2 uv : TEXCOORD; 
 };
 
 struct VSOut
 {
 	float4 pos		: SV_POSITION;
-	float2 uv : TEXCOORD;
 	float4 normal : NORMAL;
+	float2 uv : TEXCOORD;
 };
 
 cbuffer CB : register(b0)

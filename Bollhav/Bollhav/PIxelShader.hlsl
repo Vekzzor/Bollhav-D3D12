@@ -1,8 +1,8 @@
 struct VSOut
 {
-	float4 pos		: SV_POSITION;
-	float2 uv	: TEXCOORD;
-	float4 normal : NOMRAL; 
+	float4 pos : SV_POSITION;
+	float4 normal : NORMAL;
+	float2 uv : TEXCOORD;
 };
 
 float4 PS_main( VSOut input ) : SV_TARGET0
