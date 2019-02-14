@@ -3,7 +3,7 @@
 #include <Core/Window/Window.h>
 
 
-int main()
+int main(int argc, char** argv)
 {
 	Window window(VideoMode(), L"Hejsan");
 

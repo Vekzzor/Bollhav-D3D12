@@ -17,7 +17,7 @@ cbuffer CB : register(b0)
 	//Transfer data
 }
 
-VSOut VS_main( VSIn input, uint index : SV_VertexID )
+VSOut VS_main( VSIn input )
 {
 	VSOut output	= (VSOut)0;
 	output.pos		= float4( input.pos, 1.0f );
