@@ -1,5 +1,7 @@
+#include <Core/Input/Input.h>
 #include <Core/Render/Renderer.h>
 #include <Core/Window/Window.h>
+
 
 int main()
 {
@@ -8,7 +10,7 @@ int main()
 	Renderer r;
 	r.init(window.getSize().x, window.getSize().y, window.getHandle());
 
-	while(window.isOpen())
+	while(false == Input::IsKeyPressed(VK_ESCAPE) && window.isOpen())
 	{
 		window.pollEvents();
 	}

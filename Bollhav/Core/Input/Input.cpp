@@ -1,6 +1,6 @@
 #include "Input.h"
+
 #include <Core/Window/Window.h>
-#include <Windows.h> // For GetAsyncKeyState()
 
 bool Input::IsKeyPressed(int _keyCode)
 {

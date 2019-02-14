@@ -1,11 +1,4 @@
 #pragma once
-#include <d3d12.h>
-#include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
-#include <d3dcompiler.h>
-
-#pragma comment (lib, "d3d12.lib")
-#pragma comment (lib, "DXGI.lib")
-#pragma comment (lib, "d3dcompiler.lib")
 
 static const UINT NUMOFBUFFERS = 2; 
 
