@@ -54,10 +54,10 @@ public:
 	Renderer(); 
 	~Renderer(); 
 	
-	void init(const UINT wWidth, const UINT wHeight, HWND& wndHandle);
+	void init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle);
 
 	void CreateDevice(); 
-	void CreateSwapChainAndCommandIterface(HWND& whand); 
+	void CreateSwapChainAndCommandIterface(const HWND& whand); 
 	void CreateFenceAndEventHadle(); 
 	void CreateRenderTarget(); 
 	void CreateViewportAndScissorRect(); 
