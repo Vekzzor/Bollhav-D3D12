@@ -240,7 +240,7 @@ void Renderer::CreatePiplelineStateAndShaders()
 	////// Shader Compiles //////
 	ID3DBlob* vertexBlob;
 	hr = D3DCompileFromFile(
-		L"VertexShader.hlsl", // filename
+		L"Shaders/VertexShader.hlsl", // filename
 		nullptr, // optional macros
 		nullptr, // optional include files
 		"VS_main", // entry point
@@ -255,7 +255,7 @@ void Renderer::CreatePiplelineStateAndShaders()
 
 	ID3DBlob* pixelBlob;
 	hr = D3DCompileFromFile(
-		L"PixelShader.hlsl", // filename
+		L"Shaders/PixelShader.hlsl", // filename
 		nullptr, // optional macros
 		nullptr, // optional include files
 		"PS_main", // entry point
