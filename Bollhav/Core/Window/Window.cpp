@@ -1,8 +1,4 @@
 #include "Window.h"
-#include <assert.h>
-#include <codecvt> // To convert to wstring
-#include <iostream>
-#include <locale> // To convert to wstring
 
 namespace
 {

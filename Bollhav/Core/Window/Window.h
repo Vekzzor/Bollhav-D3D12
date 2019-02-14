@@ -4,10 +4,7 @@
 #endif
 
 #include <Core/Window/VideoMode.h>
-#include <DirectXMath.h>
-#include <Windows.h>
-#include <functional> // For std::function
-#include <string>
+
 
 class Framework;
 
