@@ -334,3 +334,47 @@ void Renderer::CreatePiplelineStateAndShaders()
 
 	hr = m_device4->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&m_graphPipelineState));
 }
+
+void Renderer::CreateCopyStructure() 
+{
+
+}
+
+void Renderer::CreateObjectData(CURRENT_VALUES& currentObject) 
+{
+	/*Temporary since this is not the proper way to
+	transfer vertex buffer data.*/ 
+
+	D3D12_HEAP_PROPERTIES hp = {}; 
+	hp.Type					 = D3D12_HEAP_TYPE_UPLOAD; 
+	hp.CreationNodeMask		 = 1; 
+	hp.VisibleNodeMask		 = 1; 
+
+	D3D12_RESOURCE_DESC rd = {}; 
+	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_BUFFER; 
+	rd.Width			   = sizeof(currentObject); 
+	rd.Height			   = 1; 
+	rd.DepthOrArraySize	= 1; 
+	rd.MipLevels		   = 1; 
+	rd.SampleDesc.Count	= 1; 
+	rd.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; 
+	
+	//Creates both a resource and an implicit heap, such that the heap is big enough
+	//to contain the entire resource and the resource is mapped to the heap.
+	m_device4->CreateCommittedResource(&hp,
+									   D3D12_HEAP_FLAG_NONE,
+									   &rd,
+									   D3D12_RESOURCE_STATE_GENERIC_READ,
+									   nullptr,
+									   IID_PPV_ARGS(&m_pVertexBufferResource));
+
+	//This is a temp member variable, every object is to own its personal
+	//vertex buffer later. 
+	m_pVertexBufferResource->SetName(L"vb heap"); 
+
+	//Copy object to Vertex Buffer
+	void* dataBegin = nullptr; 
+	D3D12_RANGE memRange = {0, 0}; //Ain't reading the resource on the CPU. 
+	m_pVertexBufferResource->Map(0, &memRange, &dataBegin); 
+	memcpy(dataBegin,currentObject)
+}
