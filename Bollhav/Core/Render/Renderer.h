@@ -28,6 +28,7 @@ private:
 	ID3D12Device4* m_device4						   = nullptr;
 	ID3D12CommandQueue* m_commandQueue				   = nullptr;
 	ID3D12CommandAllocator* m_commandAllocator		   = nullptr;
+	ID3D12CommandAllocator* m_copyAllocator			   = nullptr;
 	ID3D12GraphicsCommandList3* m_commandList		   = nullptr;
 	IDXGISwapChain1* m_swapChain1					   = nullptr;
 	IDXGISwapChain4* m_swapChain4					   = nullptr;

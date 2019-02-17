@@ -101,6 +101,9 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 	hr = m_device4->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
 										   IID_PPV_ARGS(&m_commandAllocator));
 
+	hr = m_device4->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
+										   IID_PPV_ARGS(&m_copyAllocator));
+
 	//Create command list.
 	hr = m_device4->CreateCommandList(0,
 									  D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -345,15 +348,16 @@ void Renderer::CreateConstantBufferResources()
 
 void Renderer::CreateCopyStructure() 
 {
+	HRESULT hr; 
 	//Create Copy List
-	m_device4->CreateCommandList(
+	hr = m_device4->CreateCommandList(
 		0, 
 		D3D12_COMMAND_LIST_TYPE_COPY, 
-		m_commandAllocator, 
+		m_copyAllocator, 
 		nullptr,
 		IID_PPV_ARGS(&m_pCopyList)); 
 
-	//m_pCopyList->Close(); 
+	m_pCopyList->Close(); 
 }
 
 void Renderer::CreateObjectData() 
