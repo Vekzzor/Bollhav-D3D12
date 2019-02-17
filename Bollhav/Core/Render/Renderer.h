@@ -48,7 +48,7 @@ public:
 	Renderer(); 
 	~Renderer(); 
 	
-	void init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle);
+	void _init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle);
 
 	void CreateDevice(); 
 	void CreateSwapChainAndCommandIterface(const HWND& whand); 

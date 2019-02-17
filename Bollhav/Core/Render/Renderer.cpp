@@ -21,7 +21,7 @@ Renderer::~Renderer()
 	SafeRelease(&m_rootSignature);
 }
 
-void Renderer::init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle)
+void Renderer::_init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle)
 {
 	m_width  = wWidth;
 	m_height = wHeight;

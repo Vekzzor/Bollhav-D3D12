@@ -10,6 +10,8 @@
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
+inline void ThrowIfFailed(HRESULT hr);
+
 #include <wrl.h>
 using namespace Microsoft::WRL;
 
@@ -29,4 +31,4 @@ using namespace Microsoft::WRL;
 #include <iostream>
 #include <string>
 
-inline void ThrowIfFailed(HRESULT hr);
+

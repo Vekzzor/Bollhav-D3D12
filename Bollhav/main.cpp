@@ -8,7 +8,7 @@ int main(int argc, char** argv)
 	Window window(VideoMode(), L"Hejsan");
 
 	Renderer r;
-	r.init(window.getSize().x, window.getSize().y, window.getHandle());
+	r._init(window.getSize().x, window.getSize().y, window.getHandle());
 
 	while(false == Input::IsKeyPressed(VK_ESCAPE) && window.isOpen())
 	{
