@@ -3,6 +3,13 @@
 
 static const UINT NUMOFBUFFERS = 2;
 
+struct Vertex
+{
+	float x, y, z; // Position
+	float r, g, b; // Normal
+	float u, v; // uv
+};
+
 class Renderer
 {
 private:
@@ -29,7 +36,7 @@ private:
 	ID3D12RootSignature* m_rootSignature;
 	UINT m_renderTargetDescSize				  = 0;
 	ID3D12PipelineState* m_graphPipelineState = nullptr;
-	ID3D12CommandList* m_pCopyList = nullptr; 
+	ID3D12GraphicsCommandList* m_pCopyList	= nullptr;
 
 	//Make use of this in the right way, the way it is used
 	//now is not correct.
@@ -46,6 +53,7 @@ private:
 	/////Temporary/////
 	ID3D12Resource1* m_pVertexBufferResource = nullptr;
 	///////////////////
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
 public:
 	Renderer();
@@ -54,12 +62,15 @@ public:
 	void _init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle);
 
 	void CreateDevice();
+	void CreateCopyStructure();
 	void CreateSwapChainAndCommandIterface(const HWND& whand);
 	void CreateFenceAndEventHadle();
 	void CreateRenderTarget();
 	void CreateViewportAndScissorRect();
 	void CreateRootSignature();
 	void CreatePiplelineStateAndShaders();
-	void CreateCopyStructure(); 
-	void CreateObjectData(CURRENT_VALUES& currentObject); 
+	void CreateConstantBufferResources(); 
+
+	//TODO: Send in a CURRENT_VALUES struct after everything is ready. 
+	void CreateObjectData();
 };

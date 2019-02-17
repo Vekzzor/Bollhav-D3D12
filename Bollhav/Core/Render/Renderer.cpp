@@ -33,6 +33,7 @@ void Renderer::_init(const UINT wWidth, const UINT wHeight, const HWND& wndHandl
 	CreateViewportAndScissorRect();
 	CreateRootSignature();
 	CreatePiplelineStateAndShaders(); 
+	CreateObjectData(); 
 }
 
 void Renderer::CreateDevice()
@@ -106,6 +107,8 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 									  m_commandAllocator,
 									  nullptr,
 									  IID_PPV_ARGS(&m_commandList));
+
+	CreateCopyStructure(); 
 
 	//When creating a command list, it is originally open. The main loop expects
 	//it to be closed and we do not wish to record anything right now,
@@ -335,15 +338,45 @@ void Renderer::CreatePiplelineStateAndShaders()
 	hr = m_device4->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&m_graphPipelineState));
 }
 
-void Renderer::CreateCopyStructure() 
+void Renderer::CreateConstantBufferResources() 
 {
 
 }
 
-void Renderer::CreateObjectData(CURRENT_VALUES& currentObject) 
+void Renderer::CreateCopyStructure() 
+{
+	//Create Copy List
+	m_device4->CreateCommandList(
+		0, 
+		D3D12_COMMAND_LIST_TYPE_COPY, 
+		m_commandAllocator, 
+		nullptr,
+		IID_PPV_ARGS(&m_pCopyList)); 
+
+	//m_pCopyList->Close(); 
+}
+
+void Renderer::CreateObjectData() 
 {
 	/*Temporary since this is not the proper way to
-	transfer vertex buffer data.*/ 
+	transfer vertex buffer data. The triangle is also temporary.*/ 
+
+	HRESULT hr; 
+
+	Vertex triangleVertices[3] = {
+		0.0f,0.5f,0.0f,
+		0.0f,0.0f,1.0f,
+		0.0f,0.5f,
+
+		0.5f,-0.5f,0.0f,
+		0.0f,0.0f,1.0f,
+		0.5f,-0.5f,
+
+		-0.5f, -0.5f,  0.0f, 
+		0.0f, 0.0f, 1.0f, 
+		-0.5f, -0.5f
+	};
+
 
 	D3D12_HEAP_PROPERTIES hp = {}; 
 	hp.Type					 = D3D12_HEAP_TYPE_UPLOAD; 
@@ -352,7 +385,7 @@ void Renderer::CreateObjectData(CURRENT_VALUES& currentObject)
 
 	D3D12_RESOURCE_DESC rd = {}; 
 	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_BUFFER; 
-	rd.Width			   = sizeof(currentObject); 
+	rd.Width			   = sizeof(triangleVertices); 
 	rd.Height			   = 1; 
 	rd.DepthOrArraySize	= 1; 
 	rd.MipLevels		   = 1; 
@@ -361,7 +394,7 @@ void Renderer::CreateObjectData(CURRENT_VALUES& currentObject)
 	
 	//Creates both a resource and an implicit heap, such that the heap is big enough
 	//to contain the entire resource and the resource is mapped to the heap.
-	m_device4->CreateCommittedResource(&hp,
+	hr = m_device4->CreateCommittedResource(&hp,
 									   D3D12_HEAP_FLAG_NONE,
 									   &rd,
 									   D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -376,5 +409,11 @@ void Renderer::CreateObjectData(CURRENT_VALUES& currentObject)
 	void* dataBegin = nullptr; 
 	D3D12_RANGE memRange = {0, 0}; //Ain't reading the resource on the CPU. 
 	m_pVertexBufferResource->Map(0, &memRange, &dataBegin); 
-	memcpy(dataBegin,currentObject)
+	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices)); 
+	m_pVertexBufferResource->Unmap(0, nullptr); 
+
+	//Initialize Vertex Buffer view (used in the render call). 
+	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress(); 
+	m_vertexBufferView.StrideInBytes  = sizeof(Vertex); 
+	m_vertexBufferView.SizeInBytes	= sizeof(triangleVertices); 
 }
