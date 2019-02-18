@@ -126,9 +126,13 @@ bool Window::registerWindowClass()
 	return RegisterClassW(&windowClass);
 }
 
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 ////////////////////////////////////////////////////
 bool Window::processEvent(UINT _message, WPARAM _wParam, LPARAM _lParam)
 {
+	if(ImGui_ImplWin32_WndProcHandler(m_handle, _message, _wParam, _lParam))
+		return true;
+
 	switch(_message)
 	{
 	case WM_DESTROY:

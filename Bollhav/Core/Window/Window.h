@@ -1,12 +1,5 @@
 #pragma once
-#ifndef WIN32_LEAN_AND_MEAN
-#	define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers.
-#endif
-
 #include <Core/Window/VideoMode.h>
-
-
-class Framework;
 
 class Window
 {
@@ -28,8 +21,6 @@ public:
 	bool isOpen() const;
 	void closeWindow();
 	HWND getHandle() const;
-
-	void toggleFullscreenWindow(Framework* _framework);
 
 	void SetWindowSizeCallback(std::function<void(int, int, bool)> _func);
 

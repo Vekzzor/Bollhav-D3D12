@@ -52,7 +52,7 @@ CURRENT_VALUES OBJLoader::loadObj(char * path)
 				nFound = true;
 
 				XMFLOAT3A normal = {};
-				fscanf_s(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", normal.x, normal.y, normal.z);
+				fscanf_s(dynamic_cast<FILE*>(&objFile), "%f %f %f\n", &normal.x, &normal.y, &normal.z);
 				m_currentValues.out_normals.push_back(normal);
 			}
 			else if (type == "f")

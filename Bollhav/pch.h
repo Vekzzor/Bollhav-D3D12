@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PCH_H
+#define PCH_H
 
 // DirectX
 #include <DirectXMath.h>
@@ -10,7 +11,7 @@
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-inline void ThrowIfFailed(HRESULT hr);
+constexpr int NUM_BACKBUFFERS = 3;
 
 #include <wrl.h>
 using namespace Microsoft::WRL;
@@ -31,4 +32,22 @@ using namespace Microsoft::WRL;
 #include <iostream>
 #include <string>
 
+// ImGui
+#include <Utility/imgui.h>
+#include <Utility/imgui_impl_dx12.h>
+#include <Utility/imgui_impl_win32.h>
 
+inline void TIF(HRESULT hr)
+{
+#if _DEBUG
+	if(FAILED(hr))
+	{
+		_com_error err(hr);
+		char s_str[256] = {};
+		sprintf_s(s_str, "%s", err.ErrorMessage());
+		throw std::runtime_error(s_str);
+	}
+#endif
+}
+
+#endif

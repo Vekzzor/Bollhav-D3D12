@@ -1,14 +1,19 @@
 #pragma once
 
+#include <Core/Graphics/Device.h>
+#include <Core/Graphics/GraphicsCommandQueue.h>
+#include <Core/Graphics/Swapchain.h>
+
 class GraphicsCore
 {
 public:
 	GraphicsCore();
 	~GraphicsCore();
 
-private:
-	ComPtr<ID3D12Device4> m_pDevice;
+	ID3D12Device4* GetDevice() const;
 
 private:
-	void _init();
+	Device m_Device;
+	Swapchain m_Swapchain;
+	GraphicsCommandQueue m_CommandQueue;
 };

@@ -132,7 +132,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Core\Graphics\Device.cpp" />
+    <ClCompile Include="Core\Graphics\Frame.cpp" />
+    <ClCompile Include="Core\Graphics\FrameManager.cpp" />
+    <ClCompile Include="Core\Graphics\GraphicsCommandQueue.cpp" />
     <ClCompile Include="Core\Graphics\GraphicsCore.cpp" />
+    <ClCompile Include="Core\Graphics\Swapchain.cpp" />
     <ClCompile Include="Core\Input\Input.cpp" />
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
@@ -140,15 +145,34 @@
     <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="Core\Render\Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
+    <ClCompile Include="Utility\imgui.cpp" />
+    <ClCompile Include="Utility\imgui_demo.cpp" />
+    <ClCompile Include="Utility\imgui_draw.cpp" />
+    <ClCompile Include="Utility\imgui_impl_dx12.cpp" />
+    <ClCompile Include="Utility\imgui_impl_win32.cpp" />
+    <ClCompile Include="Utility\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Core\Graphics\Device.h" />
+    <ClInclude Include="Core\Graphics\Frame.h" />
+    <ClInclude Include="Core\Graphics\FrameManager.h" />
+    <ClInclude Include="Core\Graphics\GraphicsCommandQueue.h" />
     <ClInclude Include="Core\Graphics\GraphicsCore.h" />
+    <ClInclude Include="Core\Graphics\Swapchain.h" />
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
     <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="Core\Render\Renderer.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Utility\imconfig.h" />
+    <ClInclude Include="Utility\imgui.h" />
+    <ClInclude Include="Utility\imgui_impl_dx12.h" />
+    <ClInclude Include="Utility\imgui_impl_win32.h" />
+    <ClInclude Include="Utility\imgui_internal.h" />
+    <ClInclude Include="Utility\imstb_rectpack.h" />
+    <ClInclude Include="Utility\imstb_textedit.h" />
+    <ClInclude Include="Utility\imstb_truetype.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
