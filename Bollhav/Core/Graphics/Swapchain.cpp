@@ -59,7 +59,7 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 
 	for(UINT i = 0; i < NUM_BACK_BUFFERS; i++)
 	{
-		TIF(m_pSwapchain->GetBuffer(1, IID_PPV_ARGS(&m_pRenderTarget[i])));
+		TIF(m_pSwapchain->GetBuffer(i, IID_PPV_ARGS(&m_pRenderTarget[i])));
 		_pDevice->CreateRenderTargetView(m_pRenderTarget[i].Get(), nullptr, m_RTDescriptor[i]);
 	}
 }
