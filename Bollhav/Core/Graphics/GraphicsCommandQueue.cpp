@@ -1,5 +1,4 @@
 #include "GraphicsCommandQueue.h"
-#include "pch.h"
 
 GraphicsCommandQueue::GraphicsCommandQueue(ID3D12Device4* _device)
 {

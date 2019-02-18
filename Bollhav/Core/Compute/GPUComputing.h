@@ -4,7 +4,7 @@ class GPUComputing
 public:
 	GPUComputing();
 	~GPUComputing();
-	int init(ID3D12Device4* device, ID3DBlob* computeBlob, ID3D12RootSignature* rootSignature);
+	int init(ID3D12Device4* device);
 	ID3D12CommandQueue* CommandQueue()
 	{
 		return m_pComputeQueue.Get();
@@ -24,13 +24,12 @@ public:
 
 private:
 	void m_CreateCommandInterface(ID3D12Device4* device);
-	void m_CreatePipeLineState(ID3D12Device4* device,
-							   ID3DBlob* computeBlob,
-							   ID3D12RootSignature* rootSignature);
+	void m_CreatePipeLineState(ID3D12Device4* device);
 
 private:
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_pComputeQueue;
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_pComputeAllocator;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_pComputeList;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pPipelineState;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_pRootSignature;
 };

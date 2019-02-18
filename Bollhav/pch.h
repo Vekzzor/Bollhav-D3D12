@@ -1,5 +1,4 @@
-#ifndef PCH_H
-#define PCH_H
+#pragma once
 
 // DirectX
 #include <DirectXMath.h>
@@ -50,5 +49,3 @@ inline void TIF(HRESULT hr)
 	}
 #endif
 }
-
-#endif

@@ -72,7 +72,11 @@
     <ClCompile Include="Core\Graphics\Frame.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+
     <ClCompile Include="Core\Graphics\CommandList.cpp">
+
+    <ClCompile Include="Core\Compute\GPUComputing.cpp">
+
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -137,10 +141,14 @@
     <ClInclude Include="Core\Graphics\Frame.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+
     <ClInclude Include="Core\Graphics\ConstantBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Graphics\CommandList.h">
+
+    <ClInclude Include="Core\Compute\GPUComputing.h">
+
     <ClInclude Include="d3dx12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
