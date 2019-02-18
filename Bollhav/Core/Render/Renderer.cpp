@@ -97,6 +97,9 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 	D3D12_COMMAND_QUEUE_DESC cqd = {};
 	hr = m_device4->CreateCommandQueue(&cqd, IID_PPV_ARGS(&m_commandQueue));
 
+	D3D12_COMMAND_QUEUE_DESC ccqd = {};
+	hr = m_device4->CreateCommandQueue(&ccqd, IID_PPV_ARGS(&m_copyCommandQueue)); 
+
 	//Create command allocator. The command allocator corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	hr = m_device4->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -343,6 +346,17 @@ void Renderer::CreatePiplelineStateAndShaders()
 }
 
 void Renderer::CreateConstantBufferResources() {}
+
+void Renderer::ExecuteCopy() 
+{
+	ID3D12CommandList* list[] = {m_pCopyList};
+	m_copyCommandQueue->ExecuteCommandLists(1, list);
+}
+
+void Renderer::ExeuteRender() 
+{
+	m_commandQueue->ExecuteCommandLists(1, m_commandList); 
+}
 
 void Renderer::CreateCopyStructure()
 {
