@@ -164,6 +164,7 @@
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
+    <ClInclude Include="d3dx12.h" />
     <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="Core\Render\Renderer.h" />
     <ClInclude Include="pch.h" />

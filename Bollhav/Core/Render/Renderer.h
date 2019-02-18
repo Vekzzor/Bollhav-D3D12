@@ -53,8 +53,10 @@ private:
 
 	/////Temporary/////
 	ID3D12Resource1* m_pVertexBufferResource = nullptr;
+	ID3D12Resource1* m_pVertexBufferUploadHeap	 = nullptr; 
 	///////////////////
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+
 
 public:
 	Renderer();
