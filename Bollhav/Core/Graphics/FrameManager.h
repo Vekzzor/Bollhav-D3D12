@@ -10,7 +10,7 @@ public:
 
 	void SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue);
 
-	ComPtr<ID3D12GraphicsCommandList4> m_pCommandList;
+	ComPtr<ID3D12GraphicsCommandList> m_pCommandList;
 private:
 	Frame m_Frames[NUM_BACKBUFFERS];
 	UINT m_iFrameIndex;
