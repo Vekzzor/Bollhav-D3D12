@@ -7,6 +7,7 @@
 #include <Core/Graphics/GraphicsCommandQueue.h>
 #include <Core/Graphics/Swapchain.h>
 #include <Core/Window/Window.h>
+#include <Core/Compute/GPUComputing.h>
 
 int main(int, char**)
 {
@@ -19,6 +20,8 @@ int main(int, char**)
 
 	FrameManager fm(device.GetDevice());
 
+	GPUComputing compute;
+	compute.init(device.GetDevice());
 	//// Initialize Direct3D
 	//if(CreateDeviceD3D(window.getHandle()) < 0)
 	//{
@@ -52,7 +55,6 @@ int main(int, char**)
 						DXGI_FORMAT_R8G8B8A8_UNORM,
 						g_imguiSRVHeap->GetCPUDescriptorHandleForHeapStart(),
 						g_imguiSRVHeap->GetGPUDescriptorHandleForHeapStart());
-
 
 	bool show_demo_window	= true;
 	bool show_another_window = false;
@@ -149,7 +151,6 @@ int main(int, char**)
 
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
 	}
-
 
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
