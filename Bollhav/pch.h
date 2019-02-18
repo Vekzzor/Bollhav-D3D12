@@ -31,6 +31,7 @@ using namespace Microsoft::WRL;
 #include <functional> // For std::function
 #include <iostream>
 #include <string>
+#include <vector>
 
 // ImGui
 #include <Utility/imgui.h>

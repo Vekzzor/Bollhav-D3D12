@@ -18,7 +18,7 @@ FrameManager::FrameManager(ID3D12Device4* _pDevice)
 
 Frame* FrameManager::GetReadyFrame(Swapchain* _pSwapChain)
 {
-	UINT nextFrameIndex = m_iFrameIndex + 1;
+	UINT nextFrameIndex		 = m_iFrameIndex + 1;
 	m_iFrameIndex			 = nextFrameIndex;
 	HANDLE waitableObjects[] = {_pSwapChain->GetWaitObject(), NULL};
 	DWORD numWaitableObjects = 1;

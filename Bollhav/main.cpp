@@ -2,6 +2,7 @@
 // If you are new to dear imgui, see examples/README.txt and documentation at the top of imgui.cpp.
 // FIXME: 64-bit only for now! (Because sizeof(ImTextureId) == sizeof(void*))
 
+#include <Core/Graphics/CommandList.h>
 #include <Core/Graphics/Device.h>
 #include <Core/Graphics/FrameManager.h>
 #include <Core/Graphics/GraphicsCommandQueue.h>
@@ -18,7 +19,7 @@ int main(int, char**)
 	sc.Init(device.GetDevice(), CommandQueue.GetCommandQueue());
 
 	FrameManager fm(device.GetDevice());
-
+	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
 	//// Initialize Direct3D
 	//if(CreateDeviceD3D(window.getHandle()) < 0)
 	//{
@@ -52,7 +53,6 @@ int main(int, char**)
 						DXGI_FORMAT_R8G8B8A8_UNORM,
 						g_imguiSRVHeap->GetCPUDescriptorHandleForHeapStart(),
 						g_imguiSRVHeap->GetGPUDescriptorHandleForHeapStart());
-
 
 	bool show_demo_window	= true;
 	bool show_another_window = false;
@@ -127,29 +127,29 @@ int main(int, char**)
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-		fm.m_pCommandList->Reset(frameCtxt->GetCommandAllocator(), NULL);
-		fm.m_pCommandList->ResourceBarrier(1, &barrier);
-		fm.m_pCommandList->ClearRenderTargetView(
+		cl->Reset(frameCtxt->GetCommandAllocator(), NULL);
+		cl->ResourceBarrier(1, &barrier);
+		cl->ClearRenderTargetView(
 			sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
-		fm.m_pCommandList->OMSetRenderTargets(1, &sc.GetCurrentDescriptor(), FALSE, NULL);
+		cl->OMSetRenderTargets(1, &sc.GetCurrentDescriptor(), FALSE, NULL);
 		ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
-		fm.m_pCommandList->SetDescriptorHeaps(1, ppHeaps);
+		cl->SetDescriptorHeaps(1, ppHeaps);
+
 		ImGui::Render();
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), fm.m_pCommandList.Get());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
+
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
-		fm.m_pCommandList->ResourceBarrier(1, &barrier);
-		fm.m_pCommandList->Close();
+		cl->ResourceBarrier(1, &barrier);
+		cl->Close();
 
-		ID3D12CommandList* listsToExecute[] = {fm.m_pCommandList.Get()};
-		CommandQueue.GetCommandQueue()->ExecuteCommandLists(_countof(listsToExecute),
-															listsToExecute);
+		CommandQueue.SubmitList(cl.GetPtr());
+		CommandQueue.Execute();
 
 		sc.Present();
 
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
 	}
-
 
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();

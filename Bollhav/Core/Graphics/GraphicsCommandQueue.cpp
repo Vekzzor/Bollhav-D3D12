@@ -10,6 +10,17 @@ GraphicsCommandQueue::GraphicsCommandQueue(ID3D12Device4* _device)
 	TIF(_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_pCommandQueue)));
 }
 
+void GraphicsCommandQueue::SubmitList(ID3D12CommandList* _pCommandList)
+{
+	m_pExecuteList.push_back(_pCommandList);
+}
+
+void GraphicsCommandQueue::Execute()
+{
+	m_pCommandQueue->ExecuteCommandLists(m_pExecuteList.size(), m_pExecuteList.data());
+	m_pExecuteList.clear();
+}
+
 ID3D12CommandQueue* GraphicsCommandQueue::GetCommandQueue() const
 {
 	return m_pCommandQueue.Get();
