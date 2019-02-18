@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include <d3dx12.h>
 
 Renderer::Renderer() {}
 
@@ -32,8 +33,8 @@ void Renderer::_init(const UINT wWidth, const UINT wHeight, const HWND& wndHandl
 	CreateRenderTarget();
 	CreateViewportAndScissorRect();
 	CreateRootSignature();
-	CreatePiplelineStateAndShaders(); 
-	CreateObjectData(); 
+	CreatePiplelineStateAndShaders();
+	CreateObjectData();
 }
 
 void Renderer::CreateDevice()
@@ -96,6 +97,9 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 	D3D12_COMMAND_QUEUE_DESC cqd = {};
 	hr = m_device4->CreateCommandQueue(&cqd, IID_PPV_ARGS(&m_commandQueue));
 
+	D3D12_COMMAND_QUEUE_DESC ccqd = {};
+	hr = m_device4->CreateCommandQueue(&ccqd, IID_PPV_ARGS(&m_copyCommandQueue)); 
+
 	//Create command allocator. The command allocator corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	hr = m_device4->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -111,7 +115,7 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 									  nullptr,
 									  IID_PPV_ARGS(&m_commandList));
 
-	CreateCopyStructure(); 
+	CreateCopyStructure();
 
 	//When creating a command list, it is originally open. The main loop expects
 	//it to be closed and we do not wish to record anything right now,
@@ -239,7 +243,7 @@ void Renderer::CreateRootSignature()
 		0, sBlob->GetBufferPointer(), sBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
 }
 
-void Renderer::CreatePiplelineStateAndShaders() 
+void Renderer::CreatePiplelineStateAndShaders()
 {
 	HRESULT hr;
 
@@ -305,7 +309,7 @@ void Renderer::CreatePiplelineStateAndShaders()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsd = {};
 
 	//Specify pipeline stages:
-	gpsd.pRootSignature		   = m_rootSignature; 
+	gpsd.pRootSignature		   = m_rootSignature;
 	gpsd.InputLayout		   = inputLayoutDesc;
 	gpsd.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	gpsd.VS.pShaderBytecode	= reinterpret_cast<void*>(vertexBlob->GetBufferPointer());
@@ -341,82 +345,111 @@ void Renderer::CreatePiplelineStateAndShaders()
 	hr = m_device4->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&m_graphPipelineState));
 }
 
-void Renderer::CreateConstantBufferResources() 
-{
+void Renderer::CreateConstantBufferResources() {}
 
+void Renderer::ExecuteCopy() 
+{
+	ID3D12CommandList* list[] = {m_pCopyList};
+	m_copyCommandQueue->ExecuteCommandLists(1, list);
 }
 
-void Renderer::CreateCopyStructure() 
+void Renderer::ExeuteRender() 
 {
-	HRESULT hr; 
+	m_commandQueue->ExecuteCommandLists(1, m_commandList); 
+}
+
+void Renderer::CreateCopyStructure()
+{
+	HRESULT hr;
 	//Create Copy List
 	hr = m_device4->CreateCommandList(
-		0, 
-		D3D12_COMMAND_LIST_TYPE_COPY, 
-		m_copyAllocator, 
-		nullptr,
-		IID_PPV_ARGS(&m_pCopyList)); 
+		0, D3D12_COMMAND_LIST_TYPE_COPY, m_copyAllocator, nullptr, IID_PPV_ARGS(&m_pCopyList));
 
-	m_pCopyList->Close(); 
+	m_pCopyList->Close();
 }
 
-void Renderer::CreateObjectData() 
+void Renderer::CreateObjectData()
 {
 	/*Temporary since this is not the proper way to
-	transfer vertex buffer data. The triangle is also temporary.*/ 
+	transfer vertex buffer data. The triangle is also temporary.*/
 
-	HRESULT hr; 
+	HRESULT hr;
 
-	Vertex triangleVertices[3] = {
-		0.0f,0.5f,0.0f,
-		0.0f,0.0f,1.0f,
-		0.0f,0.5f,
+	Vertex triangleVertices[3] = {0.0f,  0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  0.5f,
 
-		0.5f,-0.5f,0.0f,
-		0.0f,0.0f,1.0f,
-		0.5f,-0.5f,
+								  0.5f,  -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f,  -0.5f,
 
-		-0.5f, -0.5f,  0.0f, 
-		0.0f, 0.0f, 1.0f, 
-		-0.5f, -0.5f
-	};
+								  -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, -0.5f, -0.5f};
 
+	//Create heap properties for the GPU vertex buffer
+	D3D12_HEAP_PROPERTIES vbhp = {};
+	vbhp.Type				   = D3D12_HEAP_TYPE_DEFAULT;
+	vbhp.CreationNodeMask	  = 1;
+	vbhp.VisibleNodeMask	   = 1;
 
-	D3D12_HEAP_PROPERTIES hp = {}; 
-	hp.Type					 = D3D12_HEAP_TYPE_UPLOAD; 
-	hp.CreationNodeMask		 = 1; 
-	hp.VisibleNodeMask		 = 1; 
+	//Create Resource for the vertex buffer
+	D3D12_RESOURCE_DESC vbrd = {};
+	vbrd.Dimension			 = D3D12_RESOURCE_DIMENSION_BUFFER;
+	vbrd.Width				 = sizeof(triangleVertices);
+	vbrd.Height				 = 1;
+	vbrd.DepthOrArraySize	= 1;
+	vbrd.MipLevels			 = 1;
+	vbrd.SampleDesc.Count	= 1;
+	vbrd.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-	D3D12_RESOURCE_DESC rd = {}; 
-	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_BUFFER; 
-	rd.Width			   = sizeof(triangleVertices); 
-	rd.Height			   = 1; 
-	rd.DepthOrArraySize	= 1; 
-	rd.MipLevels		   = 1; 
-	rd.SampleDesc.Count	= 1; 
-	rd.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; 
-	
+	//Temporary create the vertex buffer for this temporary triangle.
+	hr = m_device4->CreateCommittedResource(&vbhp,
+											D3D12_HEAP_FLAG_NONE,
+											&vbrd,
+											D3D12_RESOURCE_STATE_COPY_DEST,
+											nullptr,
+											IID_PPV_ARGS(&m_pVertexBufferResource));
+
+	//Create upload buffer in the same fashion but with different heap flags.
+
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type					 = D3D12_HEAP_TYPE_UPLOAD;
+	hp.CreationNodeMask		 = 1;
+	hp.VisibleNodeMask		 = 1;
+
+	D3D12_RESOURCE_DESC rd = {};
+	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd.Width			   = sizeof(triangleVertices);
+	rd.Height			   = 1;
+	rd.DepthOrArraySize	= 1;
+	rd.MipLevels		   = 1;
+	rd.SampleDesc.Count	= 1;
+	rd.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
 	//Creates both a resource and an implicit heap, such that the heap is big enough
 	//to contain the entire resource and the resource is mapped to the heap.
 	hr = m_device4->CreateCommittedResource(&hp,
-									   D3D12_HEAP_FLAG_NONE,
-									   &rd,
-									   D3D12_RESOURCE_STATE_GENERIC_READ,
-									   nullptr,
-									   IID_PPV_ARGS(&m_pVertexBufferResource));
+											D3D12_HEAP_FLAG_NONE,
+											&rd,
+											D3D12_RESOURCE_STATE_GENERIC_READ,
+											nullptr,
+											IID_PPV_ARGS(&m_pVertexBufferUploadHeap));
 
 	//This is a temp member variable, every object is to own its personal
-	//vertex buffer later. 
-	m_pVertexBufferResource->SetName(L"vb heap"); 
+	//vertex buffer later.
+	m_pVertexBufferResource->SetName(L"vb heap");
 
-	//Copy object to Vertex Buffer
-	void* dataBegin = nullptr; 
-	D3D12_RANGE memRange = {0, 0}; //Ain't reading the resource on the CPU. 
-	m_pVertexBufferResource->Map(0, &memRange, &dataBegin); 
-	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices)); 
-	m_pVertexBufferResource->Unmap(0, nullptr); 
+	//Copy data to the upload heap, then schedule a copy
+	//from the upload heap to the vertexBuffer on the GPU.
+	D3D12_SUBRESOURCE_DATA vbData;
+	vbData.pData	  = triangleVertices;
+	vbData.RowPitch   = sizeof(triangleVertices);
+	vbData.SlicePitch = vbData.RowPitch;
 
-	//Initialize Vertex Buffer view (used in the render call). 
+	//Schedule a copy
+	UpdateSubresources<1>(
+		m_pCopyList, m_pVertexBufferResource, m_pVertexBufferUploadHeap, 0, 0, 1, &vbData);
+
+	//Create transistion barrier
+	m_pCopyList->ResourceBarrier(1,&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource, 
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+	//Initialize the vertex buffer view
 	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress(); 
 	m_vertexBufferView.StrideInBytes  = sizeof(Vertex); 
 	m_vertexBufferView.SizeInBytes	= sizeof(triangleVertices); 
