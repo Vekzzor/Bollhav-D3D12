@@ -97,8 +97,6 @@ void Renderer::CreateSwapChainAndCommandIterface(const HWND& whand)
 	D3D12_COMMAND_QUEUE_DESC cqd = {};
 	hr = m_device4->CreateCommandQueue(&cqd, IID_PPV_ARGS(&m_commandQueue));
 
-	D3D12_COMMAND_QUEUE_DESC ccqd = {};
-	hr = m_device4->CreateCommandQueue(&ccqd, IID_PPV_ARGS(&m_copyCommandQueue)); 
 
 	//Create command allocator. The command allocator corresponds
 	//to the underlying allocations in which GPU commands are stored.
@@ -347,16 +345,17 @@ void Renderer::CreatePiplelineStateAndShaders()
 
 void Renderer::CreateConstantBufferResources() {}
 
-void Renderer::ExecuteCopy() 
-{
-	ID3D12CommandList* list[] = {m_pCopyList};
-	m_copyCommandQueue->ExecuteCommandLists(1, list);
-}
-
-void Renderer::ExeuteRender() 
-{
-	m_commandQueue->ExecuteCommandLists(1, m_commandList); 
-}
+//void Renderer::ExecuteCopy()
+//{
+//	ID3D12CommandList* list[] = {m_pCopyList};
+//	m_copyCommandQueue->ExecuteCommandLists(1, list);
+//}
+//
+//void Renderer::ExeuteRender()
+//{
+//	ID3D12CommandList* list[] = {m_commandList};
+//	m_commandQueue->ExecuteCommandLists(1, list);
+//}
 
 void Renderer::CreateCopyStructure()
 {
@@ -446,11 +445,14 @@ void Renderer::CreateObjectData()
 		m_pCopyList, m_pVertexBufferResource, m_pVertexBufferUploadHeap, 0, 0, 1, &vbData);
 
 	//Create transistion barrier
-	m_pCopyList->ResourceBarrier(1,&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource, 
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	m_pCopyList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource,
+											  D3D12_RESOURCE_STATE_COPY_DEST,
+											  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	//Initialize the vertex buffer view
-	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress(); 
-	m_vertexBufferView.StrideInBytes  = sizeof(Vertex); 
-	m_vertexBufferView.SizeInBytes	= sizeof(triangleVertices); 
+	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress();
+	m_vertexBufferView.StrideInBytes  = sizeof(Vertex);
+	m_vertexBufferView.SizeInBytes	= sizeof(triangleVertices);
 }

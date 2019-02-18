@@ -1,5 +1,4 @@
 #include "Frame.h"
-#include "pch.h"
 
 Frame::Frame(ID3D12Device4* _pDevice)
 	: m_FenceValue(0)
