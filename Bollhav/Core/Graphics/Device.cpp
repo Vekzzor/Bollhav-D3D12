@@ -3,11 +3,17 @@
 Device::Device()
 {
 
-	ComPtr<ID3D12Debug> dx12Debug;
-	if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
+	ComPtr<ID3D12Debug> debugController;
+	UINT dxgiFactoryFlags = 0;
+	if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 	{
-		dx12Debug->EnableDebugLayer();
+		debugController->EnableDebugLayer();
+		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 	}
+	ComPtr<ID3D12Debug1> debugcontroller1;
+	debugController->QueryInterface(IID_PPV_ARGS(&debugcontroller1));
+	debugcontroller1->SetEnableGPUBasedValidation(true);
+
 	ComPtr<IDXGIFactory4> pFactory;
 	ComPtr<IDXGIAdapter1> pAdapter;
 	TIF(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&pFactory)));
@@ -34,6 +40,11 @@ Device::Device()
 }
 
 ID3D12Device4* Device::GetDevice() const
+{
+	return m_pDevice.Get();
+}
+
+ID3D12Device4* Device::operator->(void)
 {
 	return m_pDevice.Get();
 }

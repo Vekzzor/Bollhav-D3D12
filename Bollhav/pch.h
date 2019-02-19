@@ -2,6 +2,7 @@
 
 // DirectX
 #include <DirectXMath.h>
+#include <Utility/d3dx12.h>
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
@@ -45,6 +46,7 @@ inline void TIF(HRESULT hr)
 		_com_error err(hr);
 		char s_str[256] = {};
 		sprintf_s(s_str, "%s", err.ErrorMessage());
+		std::cerr << "Error: " << s_str << std::endl;
 		throw std::runtime_error(s_str);
 	}
 #endif
@@ -73,4 +75,4 @@ inline void SetNameIndexed(ID3D12Object*, LPCWSTR, UINT) {}
 // Assigns the name of the variable as the name of the object.
 // The indexed variant will include the index in the name of the object.
 #define NAME_D3D12_OBJECT(x) SetName((x).Get(), L#x)
-#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x,n)
+#define NAME_D3D12_OBJECT_INDEXED(x, n) SetNameIndexed((x)[n].Get(), L#x, n)

@@ -1,13 +1,11 @@
-// dear imgui: standalone example application for DirectX 12
-// If you are new to dear imgui, see examples/README.txt and documentation at the top of imgui.cpp.
-// FIXME: 64-bit only for now! (Because sizeof(ImTextureId) == sizeof(void*))
-
 #include <Core/Compute/GPUComputing.h>
 #include <Core/Graphics/CommandList.h>
 #include <Core/Graphics/Device.h>
 #include <Core/Graphics/FrameManager.h>
 #include <Core/Graphics/GraphicsCommandQueue.h>
+#include <Core/Graphics/GraphicsPipelineState.h>
 #include <Core/Graphics/Swapchain.h>
+#include <Core/Graphics/VertexBuffer.h>
 #include <Core/Window/Window.h>
 
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
@@ -30,12 +28,97 @@ int main(int, char**)
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
-	GPUComputing compute;
-	compute.init(device.GetDevice());
+	//GPUComputing compute;
+	//compute.init(device.GetDevice());
+
+	ComPtr<ID3D12RootSignature> pRootSignature;
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if(FAILED(device->CheckFeatureSupport(
+			   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+
+		D3D12_DESCRIPTOR_RANGE1 ranges[1];
+		ranges[0].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		ranges[0].NumDescriptors					= 1;
+		ranges[0].BaseShaderRegister				= 0;
+		ranges[0].RegisterSpace						= 0;
+		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+		ranges[0].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+
+		D3D12_ROOT_PARAMETER1 rootParameters[2];
+		rootParameters[0].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParameters[0].ShaderVisibility			= D3D12_SHADER_VISIBILITY_ALL;
+		rootParameters[0].Descriptor.ShaderRegister = 0;
+		rootParameters[0].Descriptor.RegisterSpace  = 0;
+		rootParameters[0].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+		rootParameters[1].ParameterType	= D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(ranges);
+		rootParameters[1].DescriptorTable.pDescriptorRanges   = ranges;
+
+		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
+		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
+		rootSig.Desc_1_1.pParameters	   = rootParameters;
+		rootSig.Desc_1_1.NumStaticSamplers = 0;
+		rootSig.Desc_1_1.pStaticSamplers   = nullptr;
+		rootSig.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+
+		TIF(D3DX12SerializeVersionedRootSignature(
+			&rootSig, featureData.HighestVersion, &signature, &error));
+		TIF(device->CreateRootSignature(0,
+										signature->GetBufferPointer(),
+										signature->GetBufferSize(),
+										IID_PPV_ARGS(&pRootSignature)));
+
+		NAME_D3D12_OBJECT(pRootSignature);
+	}
+
+	GraphicsPipelineState pso;
+	pso.SetVertexShader(L"Shaders/simpleVertex.hlsl");
+	pso.SetPixelShader(L"Shaders/simplePixel.hlsl");
+	pso.Finalize(device.GetDevice(), pRootSignature.Get());
+
+	float verts[] = {
+		0.0f,
+		0.25f,
+		0.0f,
+		// First point
+		0.25f,
+		-0.25f,
+		0.0f,
+		// Second point
+		- 0.25f,
+		-0.25f,
+		0.0f
+		// Third point
+	};
+	VertexBuffer vb(device.GetDevice(), verts, sizeof(verts));
+
+	D3D12_VIEWPORT vp;
+	vp.TopLeftX = 0.0f;
+	vp.TopLeftY = 0.0f;
+	vp.Width	= window.getSize().x;
+	vp.Height   = window.getSize().y;
+	vp.MinDepth = D3D12_MIN_DEPTH;
+	vp.MaxDepth = D3D12_MAX_DEPTH;
+
+	D3D12_RECT scissor;
+	scissor.left   = 0;
+	scissor.right  = vp.Width;
+	scissor.top	= 0;
+	scissor.bottom = vp.Height;
 
 	while(window.isOpen())
 	{
-
 		window.pollEvents();
 
 		// Rendering
@@ -47,6 +130,15 @@ int main(int, char**)
 		cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
 		cl->OMSetRenderTargets(1, &sc.GetCurrentDescriptor(), FALSE, NULL);
 
+
+		cl->SetGraphicsRootSignature(pRootSignature.Get());
+		cl->SetPipelineState(pso.GetPtr());
+		cl->RSSetViewports(1, &vp);
+		cl->RSSetScissorRects(1, &scissor);
+		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
+		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		cl->DrawInstanced(3, 1, 0, 0);
+	
 		ImguiDraw(cl.GetPtr());
 
 		cl.Finish();
