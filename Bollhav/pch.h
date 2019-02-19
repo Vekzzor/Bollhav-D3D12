@@ -1,12 +1,12 @@
 #pragma once
 
 // DirectX
-#include <DirectXMath.h>
+#include <DirectXMath.h> 
 #include <Utility/d3dx12.h>
 #include <d3d12.h>
 #include <d3dcompiler.h>
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
-
+using namespace DirectX;
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "d3dcompiler.lib")

@@ -132,8 +132,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Core\Camera\FPSCamera.cpp" />
     <ClCompile Include="Core\Graphics\CommandList.cpp" />
     <ClCompile Include="Core\Compute\GPUComputing.cpp" />
+    <ClCompile Include="Core\Graphics\ConstantBuffer.cpp" />
     <ClCompile Include="Core\Graphics\Device.cpp" />
     <ClCompile Include="Core\Graphics\Frame.cpp" />
     <ClCompile Include="Core\Graphics\FrameManager.cpp" />
@@ -157,6 +159,7 @@
     <ClCompile Include="Utility\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Core\Camera\FPSCamera.h" />
     <ClInclude Include="Core\Graphics\CommandList.h" />
     <ClInclude Include="Core\Graphics\ConstantBuffer.h" />
     <ClInclude Include="Core\Compute\GPUComputing.h" />
@@ -201,9 +204,9 @@
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">vs_main</EntryPointName>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">vs_main</EntryPointName>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.1</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

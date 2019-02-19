@@ -1,5 +1,6 @@
 #include <Core/Compute/GPUComputing.h>
 #include <Core/Graphics/CommandList.h>
+#include <Core/Graphics/ConstantBuffer.h>
 #include <Core/Graphics/Device.h>
 #include <Core/Graphics/FrameManager.h>
 #include <Core/Graphics/GraphicsCommandQueue.h>
@@ -8,10 +9,16 @@
 #include <Core/Graphics/VertexBuffer.h>
 #include <Core/Window/Window.h>
 
+#include <Core/Camera/FPSCamera.h>
+
+#include <Core/Input/Input.h>
+
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
 void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList);
+
+ComPtr<ID3D12DescriptorHeap> g_cbvHeap;
 
 int main(int, char**)
 {
@@ -21,15 +28,6 @@ int main(int, char**)
 	Swapchain sc(device.GetDevice());
 	GraphicsCommandQueue CommandQueue(device.GetDevice());
 	sc.Init(device.GetDevice(), CommandQueue.GetCommandQueue());
-
-	FrameManager fm(device.GetDevice());
-
-	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
-
-	ImguiSetup(device.GetDevice(), window.getHandle());
-
-	//GPUComputing compute;
-	//compute.init(device.GetDevice());
 
 	ComPtr<ID3D12RootSignature> pRootSignature;
 	{
@@ -56,10 +54,11 @@ int main(int, char**)
 		rootParameters[0].Descriptor.RegisterSpace  = 0;
 		rootParameters[0].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
 
-		rootParameters[1].ParameterType	= D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(ranges);
-		rootParameters[1].DescriptorTable.pDescriptorRanges   = ranges;
+		rootParameters[1].ParameterType			   = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		rootParameters[1].ShaderVisibility		   = D3D12_SHADER_VISIBILITY_ALL;
+		rootParameters[1].Constants.Num32BitValues = 16;
+		rootParameters[1].Constants.ShaderRegister = 1;
+		rootParameters[1].Constants.RegisterSpace  = 0;
 
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
 		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -87,6 +86,14 @@ int main(int, char**)
 	pso.SetPixelShader(L"Shaders/simplePixel.hlsl");
 	pso.Finalize(device.GetDevice(), pRootSignature.Get());
 
+	FrameManager fm(device.GetDevice());
+	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
+
+	ImguiSetup(device.GetDevice(), window.getHandle());
+
+	//GPUComputing compute;
+	//compute.init(device.GetDevice());
+
 	float verts[] = {
 		0.0f,
 		0.25f,
@@ -96,12 +103,31 @@ int main(int, char**)
 		-0.25f,
 		0.0f,
 		// Second point
-		- 0.25f,
+		-0.25f,
 		-0.25f,
 		0.0f
 		// Third point
 	};
 	VertexBuffer vb(device.GetDevice(), verts, sizeof(verts));
+
+	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
+	cbvHeapDesc.NumDescriptors			   = 1;
+	cbvHeapDesc.Flags					   = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	cbvHeapDesc.Type					   = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	TIF(device.GetDevice()->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&g_cbvHeap)));
+
+	struct DATA
+	{
+		DirectX::XMFLOAT4 pos;
+	};
+
+	FPSCamera camera;
+
+	DATA lol;
+	lol.pos = {0, 0, 0, 0};
+
+	ConstantBuffer buffer(device.GetDevice(), g_cbvHeap.Get(), sizeof(DATA));
+	buffer.SetData(&lol);
 
 	D3D12_VIEWPORT vp;
 	vp.TopLeftX = 0.0f;
@@ -117,28 +143,69 @@ int main(int, char**)
 	scissor.top	= 0;
 	scissor.bottom = vp.Height;
 
-	while(window.isOpen())
+	float x = 0;
+	float y = 0;
+	float z = 0;
+	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
-		window.pollEvents();
 
+		window.pollEvents();
+		float deltaTime		 = 0.01f;
+		XMVECTOR camRot		 = camera.getRotationQuat();
+		XMMATRIX camRotMat   = XMMatrixRotationQuaternion(camRot);
+		XMVECTOR camMovement = XMVectorSet(0, 0, 0, 0);
+
+		static POINT prevMouse = {0, 0};
+		if(prevMouse.x == 0 && prevMouse.y == 0)
+			GetCursorPos(&prevMouse);
+
+		POINT currMousePos;
+		GetCursorPos(&currMousePos);
+
+		float dx  = (currMousePos.x - prevMouse.x)*0.6f;
+		float dy  = (currMousePos.y - prevMouse.y) *0.6f;
+		prevMouse = currMousePos;
+
+		camera.rotate(dx * deltaTime, dy * deltaTime);
+
+		float speed = 10;
+		if(GetAsyncKeyState('W'))
+			camMovement -= camRotMat.r[2] * deltaTime * speed;
+		if(GetAsyncKeyState('S'))
+			camMovement += camRotMat.r[2] * deltaTime * speed;
+		if(GetAsyncKeyState('A'))
+			camMovement -= camRotMat.r[0] * deltaTime * speed;
+		if(GetAsyncKeyState('D'))
+			camMovement += camRotMat.r[0] * deltaTime * speed;
+		if(GetAsyncKeyState('Q'))
+			camMovement -= camRotMat.r[1] * deltaTime * speed;
+		if(GetAsyncKeyState('E'))
+			camMovement += camRotMat.r[1] * deltaTime * speed;
+
+		camera.move(camMovement);
+		camera.update(deltaTime);
+
+		buffer.SetData(&lol);
 		// Rendering
 		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 		TIF(frameCtxt->GetCommandAllocator()->Reset());
 
 		cl.Prepare(frameCtxt->GetCommandAllocator(), sc.GetCurrentRenderTarget());
-
 		cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
 		cl->OMSetRenderTargets(1, &sc.GetCurrentDescriptor(), FALSE, NULL);
 
-
 		cl->SetGraphicsRootSignature(pRootSignature.Get());
+		cl->SetGraphicsRootConstantBufferView(0, buffer.GetVirtualAddress());
+		cl->SetGraphicsRoot32BitConstants(
+			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
 		cl->SetPipelineState(pso.GetPtr());
+
 		cl->RSSetViewports(1, &vp);
 		cl->RSSetScissorRects(1, &scissor);
 		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cl->DrawInstanced(3, 1, 0, 0);
-	
+
 		ImguiDraw(cl.GetPtr());
 
 		cl.Finish();
@@ -151,7 +218,7 @@ int main(int, char**)
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
 	}
 
-	ImGui_ImplDX12_Shutdown();
+	//ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
@@ -195,8 +262,8 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 	ImGui::NewFrame();
 
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	if(show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);
+	/*if(show_demo_window)
+		ImGui::ShowDemoWindow(&show_demo_window);*/
 
 	// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 	{

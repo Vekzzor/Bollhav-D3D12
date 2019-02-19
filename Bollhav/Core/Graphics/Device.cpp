@@ -16,7 +16,7 @@ Device::Device()
 
 	ComPtr<IDXGIFactory4> pFactory;
 	ComPtr<IDXGIAdapter1> pAdapter;
-	TIF(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&pFactory)));
+	TIF(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&pFactory)));
 	//Loop through and find adapter
 	for(UINT adapterIndex = 0;
 		DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters1(adapterIndex, &pAdapter);
