@@ -1,156 +1,52 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
+    <ClCompile Include="Core\Graphics\CommandList.cpp" />
+    <ClCompile Include="Core\Compute\GPUComputing.cpp" />
+    <ClCompile Include="Core\Graphics\Device.cpp" />
+    <ClCompile Include="Core\Graphics\Frame.cpp" />
+    <ClCompile Include="Core\Graphics\FrameManager.cpp" />
+    <ClCompile Include="Core\Graphics\GraphicsCommandQueue.cpp" />
+    <ClCompile Include="Core\Graphics\GraphicsCore.cpp" />
+    <ClCompile Include="Core\Graphics\Swapchain.cpp" />
+    <ClCompile Include="Core\Input\Input.cpp" />
+    <ClCompile Include="Core\Window\VideoMode.cpp" />
+    <ClCompile Include="Core\Window\Window.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ObjLoader.cpp" />
+    <ClCompile Include="Core\Render\Renderer.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="Utility\imgui.cpp" />
+    <ClCompile Include="Utility\imgui_demo.cpp" />
+    <ClCompile Include="Utility\imgui_draw.cpp" />
+    <ClCompile Include="Utility\imgui_impl_dx12.cpp" />
+    <ClCompile Include="Utility\imgui_impl_win32.cpp" />
+    <ClCompile Include="Utility\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ObjLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Window\VideoMode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Window\Window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Input\Input.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Render\Renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\GraphicsCore.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui_demo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui_draw.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui_widgets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\Swapchain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\Device.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\GraphicsCommandQueue.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui_impl_dx12.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utility\imgui_impl_win32.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\FrameManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Core\Graphics\Frame.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-
-    <ClCompile Include="Core\Graphics\CommandList.cpp">
-
-    <ClCompile Include="Core\Compute\GPUComputing.cpp">
-
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ObjLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Window\VideoMode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Window\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Input\Input.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Render\Renderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\GraphicsCore.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imconfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imgui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imgui_internal.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imstb_rectpack.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imstb_textedit.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imstb_truetype.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\Swapchain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\Device.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\GraphicsCommandQueue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imgui_impl_dx12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\imgui_impl_win32.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\FrameManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\Frame.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-
-    <ClInclude Include="Core\Graphics\ConstantBuffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Graphics\CommandList.h">
-
-    <ClInclude Include="Core\Compute\GPUComputing.h">
-
-    <ClInclude Include="d3dx12.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClInclude Include="Core\Graphics\CommandList.h" />
+    <ClInclude Include="Core\Graphics\ConstantBuffer.h" />
+    <ClInclude Include="Core\Compute\GPUComputing.h" />
+    <ClInclude Include="Core\Graphics\Device.h" />
+    <ClInclude Include="Core\Graphics\Frame.h" />
+    <ClInclude Include="Core\Graphics\FrameManager.h" />
+    <ClInclude Include="Core\Graphics\GraphicsCommandQueue.h" />
+    <ClInclude Include="Core\Graphics\GraphicsCore.h" />
+    <ClInclude Include="Core\Graphics\Swapchain.h" />
+    <ClInclude Include="Core\Input\Input.h" />
+    <ClInclude Include="Core\Window\VideoMode.h" />
+    <ClInclude Include="Core\Window\Window.h" />
+    <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="ObjLoader.h" />
+    <ClInclude Include="Core\Render\Renderer.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="Utility\imconfig.h" />
+    <ClInclude Include="Utility\imgui.h" />
+    <ClInclude Include="Utility\imgui_impl_dx12.h" />
+    <ClInclude Include="Utility\imgui_impl_win32.h" />
+    <ClInclude Include="Utility\imgui_internal.h" />
+    <ClInclude Include="Utility\imstb_rectpack.h" />
+    <ClInclude Include="Utility\imstb_textedit.h" />
+    <ClInclude Include="Utility\imstb_truetype.h" />
   </ItemGroup>
 </Project>

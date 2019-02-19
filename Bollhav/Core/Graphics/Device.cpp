@@ -1,12 +1,12 @@
 #include "Device.h"
 #include <pch.h>
-Device::Device() {
+Device::Device()
+{
 
-	ID3D12Debug* dx12Debug = NULL;
+	ComPtr<ID3D12Debug> dx12Debug;
 	if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dx12Debug))))
 	{
 		dx12Debug->EnableDebugLayer();
-		dx12Debug->Release();
 	}
 	ComPtr<IDXGIFactory4> pFactory;
 	ComPtr<IDXGIAdapter1> pAdapter;
@@ -29,6 +29,8 @@ Device::Device() {
 			break;
 		}
 	}
+
+	NAME_D3D12_OBJECT(m_pDevice);
 }
 
 ID3D12Device4* Device::GetDevice() const

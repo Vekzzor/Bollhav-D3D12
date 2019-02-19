@@ -5,6 +5,8 @@ Frame::Frame(ID3D12Device4* _pDevice)
 {
 	TIF(_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
 										 IID_PPV_ARGS(&m_pCommandAllocator)));
+
+	NAME_D3D12_OBJECT(m_pCommandAllocator);
 }
 
 ID3D12CommandAllocator* Frame::GetCommandAllocator() const

@@ -7,6 +7,7 @@ GraphicsCommandQueue::GraphicsCommandQueue(ID3D12Device4* _device)
 	desc.Flags					  = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	desc.NodeMask				  = 1;
 	TIF(_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_pCommandQueue)));
+	NAME_D3D12_OBJECT(m_pCommandQueue);
 }
 
 void GraphicsCommandQueue::SubmitList(ID3D12CommandList* _pCommandList)
@@ -16,7 +17,7 @@ void GraphicsCommandQueue::SubmitList(ID3D12CommandList* _pCommandList)
 
 void GraphicsCommandQueue::Execute()
 {
-	m_pCommandQueue->ExecuteCommandLists(m_pExecuteList.size(), m_pExecuteList.data());
+	m_pCommandQueue->ExecuteCommandLists(static_cast<UINT>(m_pExecuteList.size()), m_pExecuteList.data());
 	m_pExecuteList.clear();
 }
 

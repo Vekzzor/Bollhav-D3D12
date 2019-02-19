@@ -5,12 +5,6 @@ FrameManager::FrameManager(ID3D12Device4* _pDevice)
 	, m_iFrameIndex(0)
 	, m_fenceLastSignaledValue(0)
 {
-	TIF(_pDevice->CreateCommandList(0,
-									D3D12_COMMAND_LIST_TYPE_DIRECT,
-									m_Frames[m_iFrameIndex].GetCommandAllocator(),
-									nullptr,
-									IID_PPV_ARGS(&m_pCommandList)));
-	TIF(m_pCommandList->Close());
 
 	TIF(_pDevice->CreateFence(m_iFrameIndex, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
 	m_hFenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);

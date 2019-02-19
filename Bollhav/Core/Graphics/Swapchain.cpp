@@ -9,6 +9,7 @@ Swapchain::Swapchain(ID3D12Device4* _device)
 	desc.NodeMask					= 1;
 
 	TIF(_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_pRTVDescHeap)));
+	NAME_D3D12_OBJECT(m_pRTVDescHeap);
 
 	size_t rtvDescriptorSize =
 		_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -53,6 +54,7 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 	TIF(factory->CreateSwapChainForHwnd(
 		_pCommandQueue, GetActiveWindow(), &sd, nullptr, nullptr, &swapChain1));
 	TIF(swapChain1->QueryInterface(IID_PPV_ARGS(&m_pSwapchain)));
+
 	m_FrameIndex = m_pSwapchain->GetCurrentBackBufferIndex();
 
 	m_pSwapchain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
@@ -64,6 +66,7 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 	{
 		TIF(m_pSwapchain->GetBuffer(i, IID_PPV_ARGS(&m_pRenderTarget[i])));
 		_pDevice->CreateRenderTargetView(m_pRenderTarget[i].Get(), nullptr, m_RTDescriptor[i]);
+		NAME_D3D12_OBJECT_INDEXED(m_pRenderTarget, i);
 	}
 }
 

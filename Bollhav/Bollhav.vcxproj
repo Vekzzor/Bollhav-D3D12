@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{3FABB2F3-72EC-4752-B6BB-68135AA5FD4E}</ProjectGuid>
     <RootNamespace>Bollhav</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -132,11 +132,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-
     <ClCompile Include="Core\Graphics\CommandList.cpp" />
-
     <ClCompile Include="Core\Compute\GPUComputing.cpp" />
-
     <ClCompile Include="Core\Graphics\Device.cpp" />
     <ClCompile Include="Core\Graphics\Frame.cpp" />
     <ClCompile Include="Core\Graphics\FrameManager.cpp" />
@@ -158,12 +155,9 @@
     <ClCompile Include="Utility\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
-
     <ClInclude Include="Core\Graphics\CommandList.h" />
     <ClInclude Include="Core\Graphics\ConstantBuffer.h" />
-
     <ClInclude Include="Core\Compute\GPUComputing.h" />
-
     <ClInclude Include="Core\Graphics\Device.h" />
     <ClInclude Include="Core\Graphics\Frame.h" />
     <ClInclude Include="Core\Graphics\FrameManager.h" />
