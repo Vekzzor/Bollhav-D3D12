@@ -1,11 +1,11 @@
 #include "FrameManager.h"
 
 FrameManager::FrameManager(ID3D12Device4* _pDevice)
-	: m_Frames{_pDevice, _pDevice, _pDevice}
-	, m_iFrameIndex(0)
+	: m_iFrameIndex(0)
 	, m_fenceLastSignaledValue(0)
 {
-
+	for(int i = 0; i < NUM_BACKBUFFERS; i++)
+		m_Frames[i] = Frame(_pDevice);
 	TIF(_pDevice->CreateFence(m_iFrameIndex, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
 	m_hFenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }

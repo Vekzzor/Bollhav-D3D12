@@ -84,6 +84,7 @@ int main(int, char**)
 	GraphicsPipelineState pso;
 	pso.SetVertexShader(L"Shaders/simpleVertex.hlsl");
 	pso.SetPixelShader(L"Shaders/simplePixel.hlsl");
+	pso.SetWireFrame(false);
 	pso.Finalize(device.GetDevice(), pRootSignature.Get());
 
 	FrameManager fm(device.GetDevice());
@@ -91,24 +92,85 @@ int main(int, char**)
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
+	ComPtr<ID3D12DescriptorHeap> pDSVHeap;
+
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type		   = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags		   = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	TIF(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&pDSVHeap)));
+	NAME_D3D12_OBJECT(pDSVHeap);
+
+	ComPtr<ID3D12Resource> pDepthResource;
+
+	D3D12_HEAP_PROPERTIES hp;
+	hp.Type					= D3D12_HEAP_TYPE_DEFAULT;
+	hp.CPUPageProperty		= D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	hp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	hp.CreationNodeMask		= 1;
+	hp.VisibleNodeMask		= 1;
+
+	D3D12_RESOURCE_DESC rd = {};
+	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	rd.Alignment		   = 0;
+	rd.Width			   = window.GetWidth();
+	rd.Height			   = window.GetHeight();
+	rd.DepthOrArraySize	= 1;
+	rd.MipLevels		   = 0;
+	rd.SampleDesc.Count	= 1;
+	rd.SampleDesc.Quality  = 0;
+	rd.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	rd.Layout			   = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	rd.Format			   = DXGI_FORMAT_D32_FLOAT;
+
+	D3D12_CLEAR_VALUE depthOp	= {};
+	depthOp.Format				 = DXGI_FORMAT_D32_FLOAT;
+	depthOp.DepthStencil.Depth   = 1;
+	depthOp.DepthStencil.Stencil = 0;
+
+	TIF(device->CreateCommittedResource(&hp,
+										D3D12_HEAP_FLAG_NONE,
+										&rd,
+										D3D12_RESOURCE_STATE_DEPTH_WRITE,
+										&depthOp,
+										IID_PPV_ARGS(&pDepthResource)));
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
+	depthStencilDesc.Format						   = DXGI_FORMAT_D32_FLOAT;
+	depthStencilDesc.ViewDimension				   = D3D12_DSV_DIMENSION_TEXTURE2D;
+	depthStencilDesc.Flags						   = D3D12_DSV_FLAG_NONE;
+
+	device->CreateDepthStencilView(
+		pDepthResource.Get(), &depthStencilDesc, pDSVHeap->GetCPUDescriptorHandleForHeapStart());
+
 	//GPUComputing compute;
 	//compute.init(device.GetDevice());
 
-	float verts[] = {
-		0.0f,
-		0.25f,
-		0.0f,
-		// First point
-		0.25f,
-		-0.25f,
-		0.0f,
-		// Second point
-		-0.25f,
-		-0.25f,
-		0.0f
-		// Third point
-	};
-	VertexBuffer vb(device.GetDevice(), verts, sizeof(verts));
+	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
+						0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+						0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+						-0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+
+						-0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
+						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
+
+						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
+						0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
+						0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+
+						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+						-0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
+	VertexBuffer vb(device.GetDevice(), vertices, sizeof(vertices));
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 	cbvHeapDesc.NumDescriptors			   = 1;
@@ -150,6 +212,20 @@ int main(int, char**)
 	{
 
 		window.pollEvents();
+		// Start the Dear ImGui frame
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+
+			static bool lol = false;
+
+		if(Input::IsKeyTyped('F'))
+		{
+			lol != lol;
+			pso.SetWireFrame(lol);
+			pso.Finalize(device.GetDevice(), pRootSignature.Get());
+		}
+
 		float deltaTime		 = 0.01f;
 		XMVECTOR camRot		 = camera.getRotationQuat();
 		XMMATRIX camRotMat   = XMMatrixRotationQuaternion(camRot);
@@ -162,11 +238,11 @@ int main(int, char**)
 		POINT currMousePos;
 		GetCursorPos(&currMousePos);
 
-		float dx  = (currMousePos.x - prevMouse.x)*0.6f;
-		float dy  = (currMousePos.y - prevMouse.y) *0.6f;
+		float dx  = (currMousePos.x - prevMouse.x) * 0.6f;
+		float dy  = (currMousePos.y - prevMouse.y) * 0.6f;
 		prevMouse = currMousePos;
 
-		camera.rotate(dx * deltaTime, dy * deltaTime);
+		camera.rotate(-dx * deltaTime, -dy * deltaTime);
 
 		float speed = 10;
 		if(GetAsyncKeyState('W'))
@@ -190,9 +266,20 @@ int main(int, char**)
 		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 		TIF(frameCtxt->GetCommandAllocator()->Reset());
 
+	
+
+		
+
 		cl.Prepare(frameCtxt->GetCommandAllocator(), sc.GetCurrentRenderTarget());
+		cl->OMSetRenderTargets(
+			1, &sc.GetCurrentDescriptor(), true, &pDSVHeap->GetCPUDescriptorHandleForHeapStart());
+		cl->ClearDepthStencilView(pDSVHeap->GetCPUDescriptorHandleForHeapStart(),
+								  D3D12_CLEAR_FLAG_DEPTH,
+								  1.0f,
+								  0,
+								  0,
+								  nullptr);
 		cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
-		cl->OMSetRenderTargets(1, &sc.GetCurrentDescriptor(), FALSE, NULL);
 
 		cl->SetGraphicsRootSignature(pRootSignature.Get());
 		cl->SetGraphicsRootConstantBufferView(0, buffer.GetVirtualAddress());
@@ -204,9 +291,15 @@ int main(int, char**)
 		cl->RSSetScissorRects(1, &scissor);
 		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->DrawInstanced(3, 1, 0, 0);
+		cl->DrawInstanced(36, 1, 0, 0);
 
 		ImguiDraw(cl.GetPtr());
+
+		ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
+		cl->SetDescriptorHeaps(1, ppHeaps);
+
+		ImGui::Render();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
 
 		cl.Finish();
 
@@ -256,11 +349,6 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 	static bool show_demo_window	= true;
 	static bool show_another_window = false;
 
-	// Start the Dear ImGui frame
-	ImGui_ImplDX12_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
 	/*if(show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);*/
@@ -306,10 +394,4 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 			show_another_window = false;
 		ImGui::End();
 	}
-
-	ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
-	_pCommandList->SetDescriptorHeaps(1, ppHeaps);
-
-	ImGui::Render();
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), _pCommandList);
 }

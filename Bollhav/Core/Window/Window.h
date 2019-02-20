@@ -18,6 +18,10 @@ public:
 	void setSize(unsigned int _width, unsigned int _height);
 	DirectX::XMUINT2 getSize() const;
 
+	UINT GetWidth() const;
+	UINT GetHeight() const;
+
+
 	bool isOpen() const;
 	void closeWindow();
 	HWND getHandle() const;

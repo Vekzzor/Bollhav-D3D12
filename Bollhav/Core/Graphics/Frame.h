@@ -3,6 +3,7 @@
 class Frame
 {
 public:
+	Frame() = default;
 	Frame(ID3D12Device4* _pDevice);
 
 	ID3D12CommandAllocator* GetCommandAllocator() const;

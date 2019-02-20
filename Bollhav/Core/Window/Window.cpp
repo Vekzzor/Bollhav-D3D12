@@ -85,6 +85,16 @@ DirectX::XMUINT2 Window::getSize() const
 	return size;
 }
 
+UINT Window::GetWidth() const
+{
+	return getSize().x;
+}
+
+UINT Window::GetHeight() const
+{
+	return getSize().y;
+}
+
 ////////////////////////////////////////////////////
 bool Window::isOpen() const
 {

@@ -12,7 +12,6 @@
     <ClCompile Include="Core\Input\Input.cpp" />
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="Core\Render\Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
@@ -26,6 +25,7 @@
     <ClCompile Include="Core\Graphics\VertexBuffer.cpp" />
     <ClCompile Include="Core\Graphics\ConstantBuffer.cpp" />
     <ClCompile Include="Core\Camera\FPSCamera.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Graphics\CommandList.h" />
