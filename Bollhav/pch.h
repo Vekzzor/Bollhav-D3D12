@@ -45,6 +45,7 @@ inline void TIF(HRESULT hr)
 		_com_error err(hr);
 		char s_str[256] = {};
 		sprintf_s(s_str, "%s", err.ErrorMessage());
+		std::cerr << "Error: " << s_str << std::endl;
 		throw std::runtime_error(s_str);
 	}
 #endif

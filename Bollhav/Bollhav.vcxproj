@@ -82,6 +82,9 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
     </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -94,7 +97,7 @@
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -112,6 +115,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,14 +133,12 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-
     <ClCompile Include="Core\Graphics\CommandList.cpp" />
-
     <ClCompile Include="Core\Compute\GPUComputing.cpp" />
-
     <ClCompile Include="Core\Graphics\Device.cpp" />
     <ClCompile Include="Core\Graphics\Frame.cpp" />
     <ClCompile Include="Core\Graphics\FrameManager.cpp" />
@@ -158,12 +160,9 @@
     <ClCompile Include="Utility\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
-
     <ClInclude Include="Core\Graphics\CommandList.h" />
     <ClInclude Include="Core\Graphics\ConstantBuffer.h" />
-
     <ClInclude Include="Core\Compute\GPUComputing.h" />
-
     <ClInclude Include="Core\Graphics\Device.h" />
     <ClInclude Include="Core\Graphics\Frame.h" />
     <ClInclude Include="Core\Graphics\FrameManager.h" />

@@ -1,6 +1,6 @@
 #pragma once
-#include <ObjLoader.h>
-
+#include <Windows.h>
+#include <d3d12.h>
 static const UINT NUMOFBUFFERS = 2;
 
 struct Vertex
@@ -24,13 +24,13 @@ private:
 		}
 	}
 
-	IDXGIFactory6* m_factory						   = nullptr;
+	IDXGIFactory4* m_factory						   = nullptr;
 	ID3D12Device4* m_device4						   = nullptr;
 	ID3D12CommandQueue* m_commandQueue				   = nullptr;
+	ID3D12CommandQueue* m_copyCommandQueue			   = nullptr;
 	ID3D12CommandAllocator* m_commandAllocator		   = nullptr;
 	ID3D12CommandAllocator* m_copyAllocator			   = nullptr;
 	ID3D12GraphicsCommandList3* m_commandList		   = nullptr;
-	IDXGISwapChain1* m_swapChain1					   = nullptr;
 	IDXGISwapChain4* m_swapChain4					   = nullptr;
 	ID3D12DescriptorHeap* m_renderTargetsHeap		   = nullptr;
 	ID3D12Resource1* m_renderTargetViews[NUMOFBUFFERS] = {};
@@ -52,28 +52,32 @@ private:
 	UINT m_height;
 
 	/////Temporary/////
-	ID3D12Resource1* m_pVertexBufferResource = nullptr;
-	ID3D12Resource1* m_pVertexBufferUploadHeap	 = nullptr; 
+	ID3D12Resource1* m_pVertexBufferResource   = nullptr;
+	ID3D12Resource1* m_pVertexBufferUploadHeap = nullptr;
 	///////////////////
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
+	UINT m_frameIndex = 0;
 
 public:
 	Renderer();
 	~Renderer();
 
-	void _init(const UINT wWidth, const UINT wHeight, const HWND& wndHandle);
+	void _init(const UINT wWidth, const UINT wHeight, HWND wndHandle);
 
 	void CreateDevice();
 	void CreateCopyStructure();
-	void CreateSwapChainAndCommandIterface(const HWND& whand);
+	void CreateSwapChainAndCommandIterface(HWND whand);
 	void CreateFenceAndEventHadle();
 	void CreateRenderTarget();
 	void CreateViewportAndScissorRect();
 	void CreateRootSignature();
 	void CreatePiplelineStateAndShaders();
-	void CreateConstantBufferResources(); 
+	void CreateConstantBufferResources();
+	void WaitForGpu(ID3D12CommandQueue* commandQueue);
 
-	//TODO: Send in a CURRENT_VALUES struct after everything is ready. 
+	//TODO: Send in a CURRENT_VALUES struct after everything is ready.
 	void CreateObjectData();
+
+	void Render();
 };
