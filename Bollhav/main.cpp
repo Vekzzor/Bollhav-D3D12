@@ -219,7 +219,7 @@ int main(int, char**)
 
 		static bool wireframe = false;
 
-		if(Input::IsKeyTyped('F'))
+		if(Input::IsKeyPressed('F'))
 		{
 			wireframe = !wireframe;
 			fm.WaitForLastSubmittedFrame();
