@@ -217,12 +217,13 @@ int main(int, char**)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-			static bool lol = false;
+		static bool wireframe = false;
 
 		if(Input::IsKeyTyped('F'))
 		{
-			lol != lol;
-			pso.SetWireFrame(lol);
+			wireframe = !wireframe;
+			fm.WaitForLastSubmittedFrame();
+			pso.SetWireFrame(wireframe);
 			pso.Finalize(device.GetDevice(), pRootSignature.Get());
 		}
 
@@ -266,10 +267,6 @@ int main(int, char**)
 		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 		TIF(frameCtxt->GetCommandAllocator()->Reset());
 
-	
-
-		
-
 		cl.Prepare(frameCtxt->GetCommandAllocator(), sc.GetCurrentRenderTarget());
 		cl->OMSetRenderTargets(
 			1, &sc.GetCurrentDescriptor(), true, &pDSVHeap->GetCPUDescriptorHandleForHeapStart());
@@ -310,8 +307,8 @@ int main(int, char**)
 
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
 	}
-
-	//ImGui_ImplDX12_Shutdown();
+	fm.WaitForLastSubmittedFrame();
+	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 

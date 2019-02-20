@@ -31,6 +31,22 @@ Frame* FrameManager::GetReadyFrame(Swapchain* _pSwapChain)
 	return currentFrame;
 }
 
+void FrameManager::WaitForLastSubmittedFrame()
+{
+	Frame* frameCtxt = &m_Frames[m_iFrameIndex % NUM_BACKBUFFERS];
+
+	UINT64 fenceValue = frameCtxt->GetFenceValue();
+	if(fenceValue == 0)
+		return; // No fence was signaled
+
+	frameCtxt->SetFenceValue( 0);
+	if(m_pFence->GetCompletedValue() >= fenceValue)
+		return;
+
+	m_pFence->SetEventOnCompletion(fenceValue, m_hFenceEvent);
+	WaitForSingleObject(m_hFenceEvent, INFINITE);
+}
+
 void FrameManager::SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue)
 {
 

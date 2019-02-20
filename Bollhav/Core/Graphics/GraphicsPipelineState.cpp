@@ -126,7 +126,7 @@ void GraphicsPipelineState::Finalize(ID3D12Device4* _pDevice, ID3D12RootSignatur
 	m_PSODesc.InputLayout.NumElements		 = inputLayouts.size();
 	m_PSODesc.InputLayout.pInputElementDescs = inputLayouts.data();
 	m_PSODesc.pRootSignature				 = _pRootSignature;
-
+	std::cout << (m_PSODesc.RasterizerState.FillMode == D3D12_FILL_MODE_WIREFRAME) << std::endl;
 	TIF(_pDevice->CreateGraphicsPipelineState(&m_PSODesc, IID_PPV_ARGS(&m_pPSO)));
 	
 	NAME_D3D12_OBJECT(m_pPSO);
