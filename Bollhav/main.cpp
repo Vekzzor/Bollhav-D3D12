@@ -51,13 +51,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 	// Run the message loop.
 
 	ren._init(600, 800, hwnd); 
-	ren.Render(); 
 
 	MSG msg = {};
 	while(GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
+		ren.Render(); 
 	}
 
 	return 0;

@@ -40,14 +40,27 @@ void Renderer::_init(const UINT wWidth, const UINT wHeight, HWND wndHandle)
 
 void Renderer::CreateDevice()
 {
-	//Enable the debug layer
+#ifdef _DEBUG
+	//Enable the D3D12 debug layer.
 	ID3D12Debug* debugController = nullptr;
 
-	TIF(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))); 
+#	ifdef STATIC_LINK_DEBUGSTUFF
+	if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	{
+		debugController->EnableDebugLayer();
+	}
+	SafeRelease(debugController);
+#	else
+	HMODULE mD3D12 = GetModuleHandle("D3D12.dll");
+	PFN_D3D12_GET_DEBUG_INTERFACE f =
+		(PFN_D3D12_GET_DEBUG_INTERFACE)GetProcAddress(mD3D12, "D3D12GetDebugInterface");
+	if(SUCCEEDED(f(IID_PPV_ARGS(&debugController))))
 	{
 		debugController->EnableDebugLayer();
 	}
 	SafeRelease(&debugController);
+#	endif
+#endif
 
 	//dxgi1_6 is only needed for initialization using an adapter.
 	IDXGIAdapter1* adapter = nullptr;
@@ -153,9 +166,7 @@ void Renderer::CreateSwapChainAndCommandIterface(HWND whand)
 		//Presuambly because the wanted crate function is only possible
 		//through a swapChain1.
 		TIF(SUCCEEDED(swapChain1->QueryInterface(IID_PPV_ARGS(&m_swapChain4))));
-		{
-			m_swapChain4->Release();
-		}
+		{}
 	}
 }
 
@@ -244,10 +255,10 @@ void Renderer::CreateRootSignature()
 	ID3DBlob* sBlob;
 	D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sBlob, nullptr);
 
-	HRESULT hr; 
+	HRESULT hr;
 
 	TIF(hr = m_device4->CreateRootSignature(
-		0, sBlob->GetBufferPointer(), sBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+			0, sBlob->GetBufferPointer(), sBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 }
 
 void Renderer::CreatePiplelineStateAndShaders()
@@ -257,33 +268,33 @@ void Renderer::CreatePiplelineStateAndShaders()
 	////// Shader Compiles //////
 	ID3DBlob* vertexBlob;
 	TIF(hr = D3DCompileFromFile(
-		L"Shaders/VertexShader.hlsl", // filename
-		nullptr, // optional macros
-		nullptr, // optional include files
-		"VS_main", // entry point
-		"vs_5_0", // shader model (target)
-		0, // shader compile options			// here DEBUGGING OPTIONS
-		0, // effect compile options
-		&vertexBlob, // double pointer to ID3DBlob
-		nullptr // pointer for Error Blob messages.
-		// how to use the Error blob, see here
-		// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	));
+			L"Shaders/VertexShader.hlsl", // filename
+			nullptr, // optional macros
+			nullptr, // optional include files
+			"VS_main", // entry point
+			"vs_5_0", // shader model (target)
+			0, // shader compile options			// here DEBUGGING OPTIONS
+			0, // effect compile options
+			&vertexBlob, // double pointer to ID3DBlob
+			nullptr // pointer for Error Blob messages.
+			// how to use the Error blob, see here
+			// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+			));
 
 	ID3DBlob* pixelBlob;
 	TIF(hr = D3DCompileFromFile(
-		L"Shaders/PixelShader.hlsl", // filename
-		nullptr, // optional macros
-		nullptr, // optional include files
-		"PS_main", // entry point
-		"ps_5_0", // shader model (target)
-		0, // shader compile options			// here DEBUGGING OPTIONS
-		0, // effect compile options
-		&pixelBlob, // double pointer to ID3DBlob
-		nullptr // pointer for Error Blob messages.
-		// how to use the Error blob, see here
-		// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	));
+			L"Shaders/PixelShader.hlsl", // filename
+			nullptr, // optional macros
+			nullptr, // optional include files
+			"PS_main", // entry point
+			"ps_5_0", // shader model (target)
+			0, // shader compile options			// here DEBUGGING OPTIONS
+			0, // effect compile options
+			&pixelBlob, // double pointer to ID3DBlob
+			nullptr // pointer for Error Blob messages.
+			// how to use the Error blob, see here
+			// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+			));
 
 	////// Input Layout //////
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {{"POSITION",
@@ -390,9 +401,7 @@ void Renderer::CreateCopyStructure()
 	HRESULT hr;
 	//Create Copy List
 	TIF(hr = m_device4->CreateCommandList(
-		0, D3D12_COMMAND_LIST_TYPE_COPY, m_copyAllocator, nullptr, IID_PPV_ARGS(&m_pCopyList)));
-
-	m_pCopyList->Close();
+			0, D3D12_COMMAND_LIST_TYPE_COPY, m_copyAllocator, nullptr, IID_PPV_ARGS(&m_pCopyList)));
 }
 
 void Renderer::CreateObjectData()
@@ -426,11 +435,11 @@ void Renderer::CreateObjectData()
 
 	//Temporary create the vertex buffer for this temporary triangle.
 	TIF(hr = m_device4->CreateCommittedResource(&vbhp,
-											D3D12_HEAP_FLAG_NONE,
-											&vbrd,
-											D3D12_RESOURCE_STATE_COPY_DEST,
-											nullptr,
-											IID_PPV_ARGS(&m_pVertexBufferResource)));
+												D3D12_HEAP_FLAG_NONE,
+												&vbrd,
+												D3D12_RESOURCE_STATE_COPY_DEST,
+												nullptr,
+												IID_PPV_ARGS(&m_pVertexBufferResource)));
 
 	//Create upload buffer in the same fashion but with different heap flags.
 
@@ -451,11 +460,11 @@ void Renderer::CreateObjectData()
 	//Creates both a resource and an implicit heap, such that the heap is big enough
 	//to contain the entire resource and the resource is mapped to the heap.
 	TIF(hr = m_device4->CreateCommittedResource(&hp,
-											D3D12_HEAP_FLAG_NONE,
-											&rd,
-											D3D12_RESOURCE_STATE_GENERIC_READ,
-											nullptr,
-											IID_PPV_ARGS(&m_pVertexBufferUploadHeap)));
+												D3D12_HEAP_FLAG_NONE,
+												&rd,
+												D3D12_RESOURCE_STATE_GENERIC_READ,
+												nullptr,
+												IID_PPV_ARGS(&m_pVertexBufferUploadHeap)));
 
 	//This is a temp member variable, every object is to own its personal
 	//vertex buffer later.
@@ -473,14 +482,23 @@ void Renderer::CreateObjectData()
 		m_pCopyList, m_pVertexBufferResource, m_pVertexBufferUploadHeap, 0, 0, 1, &vbData);
 
 	//Create transistion barrier
-	m_pCopyList->ResourceBarrier(
+	m_pCopyList->ResourceBarrier( //PROBLEM
 		1,
 		&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource,
 											  D3D12_RESOURCE_STATE_COPY_DEST,
-											  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+											  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+											  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+											  D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY
+	));
 
 	//Close the copyList, the data is now transfered and ready for use.
 	m_pCopyList->Close();
+
+	//Execute copy.
+	ID3D12CommandList* copyListsToExecute[] = {m_pCopyList};
+	m_copyCommandQueue->ExecuteCommandLists(ARRAYSIZE(copyListsToExecute), copyListsToExecute);
+
+	WaitForGpu(m_copyCommandQueue);
 
 	//Initialize the vertex buffer view
 	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress();
@@ -492,11 +510,11 @@ void Renderer::Render()
 {
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	m_copyAllocator->Reset();
-	m_copyAllocator->Reset();
+	//m_copyAllocator->Reset();
+	m_commandAllocator->Reset();
 
 	m_commandList->Reset(m_commandAllocator, m_graphPipelineState);
-	m_pCopyList->Reset(m_copyAllocator, nullptr);
+	//m_pCopyList->Reset(m_copyAllocator, nullptr);
 
 	//Set root signature
 	m_commandList->SetGraphicsRootSignature(m_rootSignature);
@@ -542,20 +560,18 @@ void Renderer::Render()
 
 	//Close the list to prepare it for execution.
 	m_commandList->Close();
+	//m_pCopyList->Close();
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = {m_commandList};
 	m_commandQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
-	ID3D12CommandList* copyListsToExecute[] = {m_pCopyList};
-	m_copyCommandQueue->ExecuteCommandLists(ARRAYSIZE(copyListsToExecute), copyListsToExecute);
-
 	//Present the frame.
 	DXGI_PRESENT_PARAMETERS pp = {};
 	m_swapChain4->Present1(0, 0, &pp);
 
-	WaitForGpu(m_copyCommandQueue);
 	WaitForGpu(m_commandQueue);
+	//WaitForGpu(m_copyCommandQueue);
 	//Wait for GPU to finish.
 	//NOT BEST PRACTICE, only used as such for simplicity.
 }
