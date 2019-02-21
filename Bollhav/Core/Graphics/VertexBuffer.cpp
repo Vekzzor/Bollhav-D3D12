@@ -39,7 +39,7 @@ VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, void* _pData, size_t _dataSi
 
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
 	m_BufferView.SizeInBytes	= _dataSize;
-	m_BufferView.StrideInBytes  = 5 * sizeof(float); // TODO(Henrik): Fix this!
+	m_BufferView.StrideInBytes  = 6 * sizeof(float); // TODO(Henrik): Fix this!
 }
 
 const D3D12_VERTEX_BUFFER_VIEW& VertexBuffer::GetVertexView() const

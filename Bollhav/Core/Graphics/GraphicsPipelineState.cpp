@@ -8,7 +8,7 @@ GraphicsPipelineState::GraphicsPipelineState()
 	//NOTE(Henrik): Make this declariations into functions when needed
 
 	m_PSODesc.RasterizerState				   = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	m_PSODesc.RasterizerState.CullMode		   = D3D12_CULL_MODE_NONE;
+	m_PSODesc.RasterizerState.CullMode		   = D3D12_CULL_MODE_FRONT;
 	m_PSODesc.BlendState					   = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	m_PSODesc.DepthStencilState.DepthEnable	= TRUE;
 	m_PSODesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;

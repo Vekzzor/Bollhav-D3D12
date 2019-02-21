@@ -32,6 +32,6 @@ public:
 
 	/*Load an OBJ file. Returns all the data collected and a status string telling us
 	wether everything succeded or not*/
-	CURRENT_VALUES loadObj(char* path); 
+	CURRENT_VALUES loadObj(const char* path); 
 };
 

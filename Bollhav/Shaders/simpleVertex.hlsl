@@ -1,7 +1,7 @@
 struct VertexIn
 {
 	float3 position : POSITION;
-	float2 uv : TEXCOORD;
+	float3 normal : NORMAL;
 };
 
 cbuffer translate : register(b0)
@@ -17,14 +17,18 @@ cbuffer projection : register(b1)
 struct VertexOut
 {
 	float4 position : SV_POSITION;
+	float3 normal : NORMAL;
 	float2 uv : TEXCOORD;
+	float3 worldPosition : POSITION;
 };
 
 VertexOut vs_main(VertexIn input)
 {
 	VertexOut output;
-	output.position   = float4(input.position, 1.0f) + pos;
-	output.position   = mul(matIndex,output.position);
-	output.uv		  = input.uv;
+	output.position		= float4(input.position, 1.0f);
+	output.worldPosition = output.position.xyz;
+	output.position		= mul(matIndex, output.position);
+	output.normal		= input.normal;
+	output.uv			= float2(1, 0); //input.normal.xy);
 	return output;
 }

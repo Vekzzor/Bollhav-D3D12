@@ -72,7 +72,7 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 
 void Swapchain::Present()
 {
-	TIF(m_pSwapchain->Present(1, 0));
+	TIF(m_pSwapchain->Present(0, 0));
 	m_FrameIndex = m_pSwapchain->GetCurrentBackBufferIndex();
 }
 

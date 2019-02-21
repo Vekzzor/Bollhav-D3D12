@@ -9,6 +9,8 @@
 #include <Core/Graphics/VertexBuffer.h>
 #include <Core/Window/Window.h>
 
+#include <Utility/ObjLoader.h>
+
 #include <Core/Camera/FPSCamera.h>
 
 #include <Core/Input/Input.h>
@@ -146,6 +148,15 @@ int main(int, char**)
 
 	//GPUComputing compute;
 	//compute.init(device.GetDevice());
+	OBJLoader obj;
+	CURRENT_VALUES ret = obj.loadObj("Assets/bunny.obj");
+
+	std::vector<XMFLOAT3> v;
+	for(int i = 0; i < ret.vertexIndices.size(); i++)
+	{
+		v.push_back(ret.out_vertices[ret.vertexIndices[i]]);
+		v.push_back(ret.out_normals[ret.normalIndices[i]]);
+	}
 
 	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
 						0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
@@ -170,7 +181,8 @@ int main(int, char**)
 						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
 						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 						-0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
-	VertexBuffer vb(device.GetDevice(), vertices, sizeof(vertices));
+	size_t size		 = v.size() * sizeof(XMFLOAT3);
+	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&v[0]), size);
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 	cbvHeapDesc.NumDescriptors			   = 1;
@@ -219,7 +231,7 @@ int main(int, char**)
 
 		static bool wireframe = false;
 
-		if(Input::IsKeyPressed('F'))
+		if(Input::IsKeyTyped('F'))
 		{
 			wireframe = !wireframe;
 			fm.WaitForLastSubmittedFrame();
@@ -242,8 +254,10 @@ int main(int, char**)
 		float dx  = (currMousePos.x - prevMouse.x) * 0.6f;
 		float dy  = (currMousePos.y - prevMouse.y) * 0.6f;
 		prevMouse = currMousePos;
-
-		camera.rotate(-dx * deltaTime, -dy * deltaTime);
+		if(Input::IsKeyPressed(VK_RBUTTON))
+		{
+			camera.rotate(-dx * deltaTime, -dy * deltaTime);
+		}
 
 		float speed = 10;
 		if(GetAsyncKeyState('W'))
@@ -288,7 +302,7 @@ int main(int, char**)
 		cl->RSSetScissorRects(1, &scissor);
 		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->DrawInstanced(36, 1, 0, 0);
+		cl->DrawInstanced(v.size() / 2, 1, 0, 0);
 
 		ImguiDraw(cl.GetPtr());
 

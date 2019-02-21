@@ -12,7 +12,6 @@
     <ClCompile Include="Core\Input\Input.cpp" />
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
-    <ClCompile Include="ObjLoader.cpp" />
     <ClCompile Include="Core\Render\Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="Utility\imgui.cpp" />
@@ -26,6 +25,7 @@
     <ClCompile Include="Core\Graphics\ConstantBuffer.cpp" />
     <ClCompile Include="Core\Camera\FPSCamera.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Utility\ObjLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Graphics\CommandList.h" />
@@ -40,7 +40,6 @@
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
-    <ClInclude Include="ObjLoader.h" />
     <ClInclude Include="Core\Render\Renderer.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Utility\imconfig.h" />
@@ -55,6 +54,7 @@
     <ClInclude Include="Core\Graphics\GraphicsPipelineState.h" />
     <ClInclude Include="Core\Graphics\VertexBuffer.h" />
     <ClInclude Include="Core\Camera\FPSCamera.h" />
+    <ClInclude Include="Utility\ObjLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\simpleVertex.hlsl" />
