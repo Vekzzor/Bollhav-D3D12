@@ -32,8 +32,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 							   // Size and position
 							   CW_USEDEFAULT,
 							   CW_USEDEFAULT,
-							   CW_USEDEFAULT,
-							   CW_USEDEFAULT,
+							   1920.0f,
+							   1080.0f,
 
 							   NULL, // Parent window
 							   NULL, // Menu
@@ -50,7 +50,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
 	// Run the message loop.
 
-	ren._init(600, 800, hwnd); 
+	ren._init(1920.0f, 1080.0f, hwnd); 
 
 	MSG msg = {};
 	while(GetMessage(&msg, NULL, 0, 0))

@@ -481,15 +481,6 @@ void Renderer::CreateObjectData()
 	UpdateSubresources<1>(
 		m_pCopyList, m_pVertexBufferResource, m_pVertexBufferUploadHeap, 0, 0, 1, &vbData);
 
-	//Create transistion barrier
-	m_pCopyList->ResourceBarrier( //PROBLEM
-		1,
-		&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource,
-											  D3D12_RESOURCE_STATE_COPY_DEST,
-											  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-											  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-											  D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY
-	));
 
 	//Close the copyList, the data is now transfered and ready for use.
 	m_pCopyList->Close();
@@ -498,7 +489,25 @@ void Renderer::CreateObjectData()
 	ID3D12CommandList* copyListsToExecute[] = {m_pCopyList};
 	m_copyCommandQueue->ExecuteCommandLists(ARRAYSIZE(copyListsToExecute), copyListsToExecute);
 
+	
 	WaitForGpu(m_copyCommandQueue);
+	
+	//Reset everything so that we can set the proper resource state for the vertex buffer. 
+	m_copyAllocator->Reset(); 
+	m_pCopyList->Reset(m_copyAllocator, nullptr);
+
+
+	//////////////////////////////////////////////////////////CHECK HERE///////////////////////////////////////////////
+	//Create transistion barrier
+	//m_pCopyList->ResourceBarrier( //PROBLEM
+	//	1,
+	//	&CD3DX12_RESOURCE_BARRIER::Transition(m_pVertexBufferResource,
+	//										  D3D12_RESOURCE_STATE_COPY_DEST,
+	//										  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+	//										  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+	//										  D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY
+	//));
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	//Initialize the vertex buffer view
 	m_vertexBufferView.BufferLocation = m_pVertexBufferResource->GetGPUVirtualAddress();
