@@ -33,6 +33,19 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 					 UINT _width,
 					 UINT _height)
 {
+	// Check for multisampling
+	int i = 0;
+	for( i= 4; i > 1; i--)
+	{
+		D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS levels = {DXGI_FORMAT_R8G8B8A8_UNORM, i};
+		if(FAILED(_pDevice->CheckFeatureSupport(
+			   D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &levels, sizeof(levels))))
+			continue;
+
+		if(levels.NumQualityLevels > 0)
+			break;
+	}
+
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	sd.BufferCount			 = NUM_BACK_BUFFERS;
 	sd.Width				 = _width;

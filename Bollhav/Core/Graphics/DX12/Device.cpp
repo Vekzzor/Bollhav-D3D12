@@ -11,8 +11,8 @@ Device::Device()
 		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 	}
 	ComPtr<ID3D12Debug1> debugcontroller1;
-	debugController->QueryInterface(IID_PPV_ARGS(&debugcontroller1));
-	debugcontroller1->SetEnableGPUBasedValidation(true);
+	/*debugController->QueryInterface(IID_PPV_ARGS(&debugcontroller1));
+	debugcontroller1->SetEnableGPUBasedValidation(true);*/
 
 	ComPtr<IDXGIFactory4> pFactory;
 	ComPtr<IDXGIAdapter1> pAdapter;

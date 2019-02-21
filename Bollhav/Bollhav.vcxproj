@@ -142,17 +142,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Core\Camera\FPSCamera.cpp" />
-    <ClCompile Include="Core\Graphics\CommandList.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\CommandList.cpp" />
     <ClCompile Include="Core\Compute\GPUComputing.cpp" />
-    <ClCompile Include="Core\Graphics\ConstantBuffer.cpp" />
-    <ClCompile Include="Core\Graphics\Device.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\ConstantBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\Device.cpp" />
     <ClCompile Include="Core\Graphics\Frame.cpp" />
     <ClCompile Include="Core\Graphics\FrameManager.cpp" />
-    <ClCompile Include="Core\Graphics\GraphicsCommandQueue.cpp" />
-    <ClCompile Include="Core\Graphics\GraphicsCore.cpp" />
-    <ClCompile Include="Core\Graphics\GraphicsPipelineState.cpp" />
-    <ClCompile Include="Core\Graphics\Swapchain.cpp" />
-    <ClCompile Include="Core\Graphics\VertexBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\GraphicsCommandQueue.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\GraphicsPipelineState.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\Swapchain.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\VertexBuffer.cpp" />
     <ClCompile Include="Core\Input\Input.cpp" />
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
@@ -169,17 +168,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Camera\FPSCamera.h" />
-    <ClInclude Include="Core\Graphics\CommandList.h" />
-    <ClInclude Include="Core\Graphics\ConstantBuffer.h" />
+    <ClInclude Include="Core\Graphics\DX12\CommandList.h" />
+    <ClInclude Include="Core\Graphics\DX12\ConstantBuffer.h" />
     <ClInclude Include="Core\Compute\GPUComputing.h" />
-    <ClInclude Include="Core\Graphics\Device.h" />
+    <ClInclude Include="Core\Graphics\DX12\Device.h" />
     <ClInclude Include="Core\Graphics\Frame.h" />
     <ClInclude Include="Core\Graphics\FrameManager.h" />
-    <ClInclude Include="Core\Graphics\GraphicsCommandQueue.h" />
-    <ClInclude Include="Core\Graphics\GraphicsCore.h" />
-    <ClInclude Include="Core\Graphics\GraphicsPipelineState.h" />
-    <ClInclude Include="Core\Graphics\Swapchain.h" />
-    <ClInclude Include="Core\Graphics\VertexBuffer.h" />
+    <ClInclude Include="Core\Graphics\DX12\GraphicsCommandQueue.h" />
+    <ClInclude Include="Core\Graphics\DX12\GraphicsPipelineState.h" />
+    <ClInclude Include="Core\Graphics\DX12\Swapchain.h" />
+    <ClInclude Include="Core\Graphics\DX12\VertexBuffer.h" />
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />

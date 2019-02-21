@@ -5,6 +5,8 @@ class GraphicsPipelineState
 public:
 	GraphicsPipelineState();
 
+
+	void SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE _topology);
 	void SetVertexShader(LPCWSTR _pFileName,
 						 LPCSTR _pEntryPoint = "vs_main",
 						 LPCSTR _pTarget	 = "vs_5_1");

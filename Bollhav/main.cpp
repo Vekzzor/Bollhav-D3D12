@@ -1,12 +1,12 @@
 #include <Core/Compute/GPUComputing.h>
-#include <Core/Graphics/CommandList.h>
-#include <Core/Graphics/ConstantBuffer.h>
-#include <Core/Graphics/Device.h>
+#include <Core/Graphics/DX12/CommandList.h>
+#include <Core/Graphics/DX12/ConstantBuffer.h>
+#include <Core/Graphics/DX12/Device.h>
+#include <Core/Graphics/DX12/GraphicsCommandQueue.h>
+#include <Core/Graphics/DX12/GraphicsPipelineState.h>
+#include <Core/Graphics/DX12/Swapchain.h>
+#include <Core/Graphics/DX12/VertexBuffer.h>
 #include <Core/Graphics/FrameManager.h>
-#include <Core/Graphics/GraphicsCommandQueue.h>
-#include <Core/Graphics/GraphicsPipelineState.h>
-#include <Core/Graphics/Swapchain.h>
-#include <Core/Graphics/VertexBuffer.h>
 #include <Core/Window/Window.h>
 
 #include <Utility/ObjLoader.h>
@@ -89,6 +89,12 @@ int main(int, char**)
 	pso.SetWireFrame(false);
 	pso.Finalize(device.GetDevice(), pRootSignature.Get());
 
+	GraphicsPipelineState psoLines;
+	psoLines.SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+	psoLines.SetVertexShader(L"Shaders/simpleVertex.hlsl");
+	psoLines.SetPixelShader(L"Shaders/simplePixel.hlsl");
+	psoLines.Finalize(device.GetDevice(), pRootSignature.Get());
+
 	FrameManager fm(device.GetDevice());
 	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
 
@@ -146,17 +152,16 @@ int main(int, char**)
 	device->CreateDepthStencilView(
 		pDepthResource.Get(), &depthStencilDesc, pDSVHeap->GetCPUDescriptorHandleForHeapStart());
 
-	//GPUComputing compute;
-	//compute.init(device.GetDevice());
 	OBJLoader obj;
-	CURRENT_VALUES ret = obj.loadObj("Assets/bunny.obj");
+	/*CURRENT_VALUES ret = obj.loadObj("Assets/bunny.obj");
 
 	std::vector<XMFLOAT3> v;
 	for(int i = 0; i < ret.vertexIndices.size(); i++)
 	{
 		v.push_back(ret.out_vertices[ret.vertexIndices[i]]);
 		v.push_back(ret.out_normals[ret.normalIndices[i]]);
-	}
+	}*/
+	float vect[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.5f};
 
 	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
 						0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
@@ -181,8 +186,33 @@ int main(int, char**)
 						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
 						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 						-0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
-	size_t size		 = v.size() * sizeof(XMFLOAT3);
-	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&v[0]), size);
+	//size_t size		 = v.size() * sizeof(XMFLOAT3);
+	//	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&v[0]), size);
+
+	// Generate grid
+	const int hw	  = 100;
+	const int step	= 5;
+	const int bigstep = 100;
+	int i			  = 0;
+
+	std::vector<XMFLOAT3> gridVerts;
+	for(i = -hw; i <= hw; i += step)
+	{
+		float hwf = static_cast<float>(hw);
+		float ii  = static_cast<float>(i);
+		XMFLOAT3 p0{ii, 0, -hwf};
+		XMFLOAT3 p1{ii, 0, hwf};
+
+		XMFLOAT3 p2{-hwf, 0, ii};
+		XMFLOAT3 p3{hwf, 0, ii};
+
+		gridVerts.push_back(p0);
+		gridVerts.push_back(p1);
+		gridVerts.push_back(p2);
+		gridVerts.push_back(p3);
+	}
+	size_t gridSizeBytes = gridVerts.size() * sizeof(XMFLOAT3);
+	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&gridVerts[0]), gridSizeBytes);
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 	cbvHeapDesc.NumDescriptors			   = 1;
@@ -224,6 +254,7 @@ int main(int, char**)
 	{
 
 		window.pollEvents();
+
 		// Start the Dear ImGui frame
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -239,42 +270,45 @@ int main(int, char**)
 			pso.Finalize(device.GetDevice(), pRootSignature.Get());
 		}
 
-		float deltaTime		 = 0.01f;
-		XMVECTOR camRot		 = camera.getRotationQuat();
-		XMMATRIX camRotMat   = XMMatrixRotationQuaternion(camRot);
-		XMVECTOR camMovement = XMVectorSet(0, 0, 0, 0);
-
-		static POINT prevMouse = {0, 0};
-		if(prevMouse.x == 0 && prevMouse.y == 0)
-			GetCursorPos(&prevMouse);
-
-		POINT currMousePos;
-		GetCursorPos(&currMousePos);
-
-		float dx  = (currMousePos.x - prevMouse.x) * 0.6f;
-		float dy  = (currMousePos.y - prevMouse.y) * 0.6f;
-		prevMouse = currMousePos;
-		if(Input::IsKeyPressed(VK_RBUTTON))
+		// Camera stuff
 		{
-			camera.rotate(-dx * deltaTime, -dy * deltaTime);
+			float deltaTime		 = 0.01f;
+			XMVECTOR camRot		 = camera.getRotationQuat();
+			XMMATRIX camRotMat   = XMMatrixRotationQuaternion(camRot);
+			XMVECTOR camMovement = XMVectorSet(0, 0, 0, 0);
+
+			static POINT prevMouse = {0, 0};
+			if(prevMouse.x == 0 && prevMouse.y == 0)
+				GetCursorPos(&prevMouse);
+
+			POINT currMousePos;
+			GetCursorPos(&currMousePos);
+
+			float dx  = (currMousePos.x - prevMouse.x) * 0.6f;
+			float dy  = (currMousePos.y - prevMouse.y) * 0.6f;
+			prevMouse = currMousePos;
+			if(Input::IsKeyPressed(VK_RBUTTON))
+			{
+				camera.rotate(-dx * deltaTime, -dy * deltaTime);
+			}
+
+			float speed = Input::IsKeyPressed(VK_SHIFT) ? 40 : 20;
+			if(GetAsyncKeyState('W'))
+				camMovement -= camRotMat.r[2] * deltaTime * speed;
+			if(GetAsyncKeyState('S'))
+				camMovement += camRotMat.r[2] * deltaTime * speed;
+			if(GetAsyncKeyState('A'))
+				camMovement -= camRotMat.r[0] * deltaTime * speed;
+			if(GetAsyncKeyState('D'))
+				camMovement += camRotMat.r[0] * deltaTime * speed;
+			if(GetAsyncKeyState('Q'))
+				camMovement -= camRotMat.r[1] * deltaTime * speed;
+			if(GetAsyncKeyState('E'))
+				camMovement += camRotMat.r[1] * deltaTime * speed;
+
+			camera.move(camMovement);
+			camera.update(deltaTime);
 		}
-
-		float speed = 10;
-		if(GetAsyncKeyState('W'))
-			camMovement -= camRotMat.r[2] * deltaTime * speed;
-		if(GetAsyncKeyState('S'))
-			camMovement += camRotMat.r[2] * deltaTime * speed;
-		if(GetAsyncKeyState('A'))
-			camMovement -= camRotMat.r[0] * deltaTime * speed;
-		if(GetAsyncKeyState('D'))
-			camMovement += camRotMat.r[0] * deltaTime * speed;
-		if(GetAsyncKeyState('Q'))
-			camMovement -= camRotMat.r[1] * deltaTime * speed;
-		if(GetAsyncKeyState('E'))
-			camMovement += camRotMat.r[1] * deltaTime * speed;
-
-		camera.move(camMovement);
-		camera.update(deltaTime);
 
 		buffer.SetData(&lol);
 		// Rendering
@@ -296,13 +330,13 @@ int main(int, char**)
 		cl->SetGraphicsRootConstantBufferView(0, buffer.GetVirtualAddress());
 		cl->SetGraphicsRoot32BitConstants(
 			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
-		cl->SetPipelineState(pso.GetPtr());
+		cl->SetPipelineState(psoLines.GetPtr());
 
 		cl->RSSetViewports(1, &vp);
 		cl->RSSetScissorRects(1, &scissor);
 		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
-		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->DrawInstanced(v.size() / 2, 1, 0, 0);
+		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+		cl->DrawInstanced(gridVerts.size(), 1, 0, 0);
 
 		ImguiDraw(cl.GetPtr());
 

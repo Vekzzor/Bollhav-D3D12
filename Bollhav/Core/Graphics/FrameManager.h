@@ -1,6 +1,6 @@
 #pragma once
 #include <Core/Graphics/Frame.h>
-#include <Core/Graphics/Swapchain.h>
+#include <Core/Graphics/DX12/Swapchain.h>
 
 class FrameManager
 {
