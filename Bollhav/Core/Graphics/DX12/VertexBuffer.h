@@ -1,9 +1,17 @@
 #pragma once
 
+struct VERTEX_BUFFER_DESC
+{
+	void* pData;
+	UINT SizeInBytes;
+	UINT StrideInBytes;
+
+};
+
 class VertexBuffer
 {
 public:
-	VertexBuffer(ID3D12Device4* _pDevice,void* _pData, size_t _dataSize);
+	VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC * _pDesc);
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexView() const;
 

@@ -212,7 +212,12 @@ int main(int, char**)
 		gridVerts.push_back(p3);
 	}
 	size_t gridSizeBytes = gridVerts.size() * sizeof(XMFLOAT3);
-	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&gridVerts[0]), gridSizeBytes);
+
+	VERTEX_BUFFER_DESC vbd;
+	vbd.pData		  = reinterpret_cast<LPVOID>(&gridVerts[0]);
+	vbd.SizeInBytes   = gridSizeBytes;
+	vbd.StrideInBytes = sizeof(XMFLOAT3);
+	VertexBuffer vb(device.GetDevice(), &vbd);
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 	cbvHeapDesc.NumDescriptors			   = 1;

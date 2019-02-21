@@ -1,6 +1,6 @@
 #include "VertexBuffer.h"
 
-VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, void* _pData, size_t _dataSize)
+VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 {
 	D3D12_HEAP_PROPERTIES heapProp;
 	heapProp.Type				  = D3D12_HEAP_TYPE_UPLOAD;
@@ -16,7 +16,7 @@ VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, void* _pData, size_t _dataSi
 	desc.Flags				= D3D12_RESOURCE_FLAG_NONE;
 	desc.Format				= DXGI_FORMAT_UNKNOWN;
 	desc.Height				= 1;
-	desc.Width				= _dataSize;
+	desc.Width				= _pDesc->SizeInBytes;
 	desc.Layout				= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	desc.MipLevels			= 1;
 	desc.SampleDesc.Count   = 1;
@@ -34,12 +34,12 @@ VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, void* _pData, size_t _dataSi
 	range.Begin = 0;
 	range.End   = 0;
 	m_pVertexData->Map(0, &range, reinterpret_cast<void**>(&pVertexDataBegin));
-	memcpy(pVertexDataBegin, _pData, _dataSize);
+	memcpy(pVertexDataBegin, _pDesc->pData, desc.Width);
 	m_pVertexData->Unmap(0, nullptr);
 
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
-	m_BufferView.SizeInBytes	= _dataSize;
-	m_BufferView.StrideInBytes  = 3 * sizeof(float); // TODO(Henrik): Fix this!
+	m_BufferView.SizeInBytes	= desc.Width;
+	m_BufferView.StrideInBytes  = _pDesc->StrideInBytes; // TODO(Henrik): Fix this!
 }
 
 const D3D12_VERTEX_BUFFER_VIEW& VertexBuffer::GetVertexView() const
