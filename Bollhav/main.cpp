@@ -245,7 +245,7 @@ int main(int, char**)
 	TIF(device->CreateDescriptorHeap(&srvUavHeapDesc, IID_PPV_ARGS(&g_Heap)));
 	NAME_D3D12_OBJECT(g_Heap);
 
-	float data = 1.0f;
+	float data = -1.0f;
 
 	D3D12_HEAP_PROPERTIES uploadHeap = {};
 	uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
