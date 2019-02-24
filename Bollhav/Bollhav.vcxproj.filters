@@ -25,6 +25,9 @@
     <ClCompile Include="Core\Graphics\DX12\GraphicsPipelineState.cpp" />
     <ClCompile Include="Core\Graphics\DX12\Swapchain.cpp" />
     <ClCompile Include="Core\Graphics\DX12\VertexBuffer.cpp" />
+    <ClCompile Include="Core\Graphics\Grid.cpp" />
+    <ClCompile Include="Core\Graphics\DX12\DepthStencil.cpp" />
+    <ClCompile Include="Core\Compute\ComputeQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Compute\GPUComputing.h" />
@@ -53,9 +56,18 @@
     <ClInclude Include="Core\Graphics\DX12\GraphicsPipelineState.h" />
     <ClInclude Include="Core\Graphics\DX12\Swapchain.h" />
     <ClInclude Include="Core\Graphics\DX12\VertexBuffer.h" />
+    <ClInclude Include="Core\Graphics\Grid.h" />
+    <ClInclude Include="Core\Graphics\DX12\DepthStencil.h" />
+    <ClInclude Include="Core\Compute\ComputeQueue.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\simpleVertex.hlsl" />
-    <FxCompile Include="Shaders\simplePixel.hlsl" />
+    <FxCompile Include="Shaders\LineVS.hlsl" />
+    <FxCompile Include="Shaders\LinePS.hlsl" />
+    <FxCompile Include="Shaders\CubeVS.hlsl" />
+    <FxCompile Include="Shaders\CubePS.hlsl" />
+    <FxCompile Include="Shaders\ComputeShader.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
   </ItemGroup>
 </Project>

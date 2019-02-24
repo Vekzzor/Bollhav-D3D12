@@ -2,6 +2,11 @@
 
 VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 {
+	Create(_pDevice, _pDesc);
+}
+
+void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+{
 	D3D12_HEAP_PROPERTIES heapProp;
 	heapProp.Type				  = D3D12_HEAP_TYPE_UPLOAD;
 	heapProp.CPUPageProperty	  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -39,10 +44,17 @@ VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
 	m_BufferView.SizeInBytes	= desc.Width;
-	m_BufferView.StrideInBytes  = _pDesc->StrideInBytes; // TODO(Henrik): Fix this!
+	m_BufferView.StrideInBytes  = _pDesc->StrideInBytes;
+
+	m_VertexCount = m_BufferView.SizeInBytes / m_BufferView.StrideInBytes;
 }
 
 const D3D12_VERTEX_BUFFER_VIEW& VertexBuffer::GetVertexView() const
 {
 	return m_BufferView;
+}
+
+UINT VertexBuffer::GetVertexCount() const
+{
+	return m_VertexCount;
 }

@@ -8,8 +8,6 @@ GraphicsPipelineState::GraphicsPipelineState()
 	//NOTE(Henrik): Make this declariations into functions when needed
 
 	m_PSODesc.RasterizerState				   = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	m_PSODesc.RasterizerState.AntialiasedLineEnable = TRUE;
-	m_PSODesc.RasterizerState.CullMode		   = D3D12_CULL_MODE_FRONT;
 	m_PSODesc.BlendState					   = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	m_PSODesc.DepthStencilState.DepthEnable	= TRUE;
 	m_PSODesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -23,9 +21,19 @@ GraphicsPipelineState::GraphicsPipelineState()
 	m_PSODesc.SampleDesc.Count				   = 1;
 }
 
-void GraphicsPipelineState::SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE _topology) 
+void GraphicsPipelineState::SetDepthStencilState(D3D12_DEPTH_STENCIL_DESC _Desc)
 {
-	m_PSODesc.PrimitiveTopologyType = _topology;
+	m_PSODesc.DepthStencilState = _Desc;
+}
+
+void GraphicsPipelineState::SetRasterizerState(D3D12_RASTERIZER_DESC _Desc)
+{
+	m_PSODesc.RasterizerState = _Desc;
+}
+
+void GraphicsPipelineState::SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE _Topology)
+{
+	m_PSODesc.PrimitiveTopologyType = _Topology;
 }
 
 void GraphicsPipelineState::SetVertexShader(LPCWSTR _pFileName,
@@ -57,7 +65,7 @@ void GraphicsPipelineState::SetPixelShader(LPCWSTR _pFileName, LPCSTR _pEntryPoi
 	m_PSODesc.PS.BytecodeLength  = m_pPixel->GetBufferSize();
 }
 
-void GraphicsPipelineState::SetWireFrame(bool _val) 
+void GraphicsPipelineState::SetWireFrame(bool _val)
 {
 	m_PSODesc.RasterizerState.FillMode = _val ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
 }
@@ -134,7 +142,7 @@ void GraphicsPipelineState::Finalize(ID3D12Device4* _pDevice, ID3D12RootSignatur
 	m_PSODesc.pRootSignature				 = _pRootSignature;
 	std::cout << (m_PSODesc.RasterizerState.FillMode == D3D12_FILL_MODE_WIREFRAME) << std::endl;
 	TIF(_pDevice->CreateGraphicsPipelineState(&m_PSODesc, IID_PPV_ARGS(&m_pPSO)));
-	
+
 	NAME_D3D12_OBJECT(m_pPSO);
 }
 

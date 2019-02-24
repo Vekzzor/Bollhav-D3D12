@@ -1,12 +1,15 @@
+#include <Core/Compute/ComputeQueue.h>
 #include <Core/Compute/GPUComputing.h>
 #include <Core/Graphics/DX12/CommandList.h>
 #include <Core/Graphics/DX12/ConstantBuffer.h>
+#include <Core/Graphics/DX12/DepthStencil.h>
 #include <Core/Graphics/DX12/Device.h>
 #include <Core/Graphics/DX12/GraphicsCommandQueue.h>
 #include <Core/Graphics/DX12/GraphicsPipelineState.h>
 #include <Core/Graphics/DX12/Swapchain.h>
 #include <Core/Graphics/DX12/VertexBuffer.h>
 #include <Core/Graphics/FrameManager.h>
+#include <Core/Graphics/Grid.h>
 #include <Core/Window/Window.h>
 
 #include <Utility/ObjLoader.h>
@@ -20,7 +23,7 @@ ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
 void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList);
 
-ComPtr<ID3D12DescriptorHeap> g_cbvHeap;
+ComPtr<ID3D12DescriptorHeap> g_Heap;
 
 int main(int, char**)
 {
@@ -30,8 +33,9 @@ int main(int, char**)
 	Swapchain sc(device.GetDevice());
 	GraphicsCommandQueue CommandQueue(device.GetDevice());
 	sc.Init(device.GetDevice(), CommandQueue.GetCommandQueue());
+	DepthStencil ds(device.GetDevice(), window.GetWidth(), window.GetHeight());
 
-	ComPtr<ID3D12RootSignature> pRootSignature;
+	ComPtr<ID3D12RootSignature> pRootGraphics;
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -49,7 +53,7 @@ int main(int, char**)
 		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 		ranges[0].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
 
-		D3D12_ROOT_PARAMETER1 rootParameters[2];
+		D3D12_ROOT_PARAMETER1 rootParameters[3];
 		rootParameters[0].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_CBV;
 		rootParameters[0].ShaderVisibility			= D3D12_SHADER_VISIBILITY_ALL;
 		rootParameters[0].Descriptor.ShaderRegister = 0;
@@ -62,6 +66,12 @@ int main(int, char**)
 		rootParameters[1].Constants.ShaderRegister = 1;
 		rootParameters[1].Constants.RegisterSpace  = 0;
 
+		rootParameters[2].ParameterType	= D3D12_ROOT_PARAMETER_TYPE_SRV;
+		rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParameters[2].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+		rootParameters[2].Descriptor.RegisterSpace = 0;
+		rootParameters[2].Descriptor.ShaderRegister = 0;
+		
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
 		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
@@ -78,165 +88,47 @@ int main(int, char**)
 		TIF(device->CreateRootSignature(0,
 										signature->GetBufferPointer(),
 										signature->GetBufferSize(),
-										IID_PPV_ARGS(&pRootSignature)));
+										IID_PPV_ARGS(&pRootGraphics)));
 
-		NAME_D3D12_OBJECT(pRootSignature);
+		NAME_D3D12_OBJECT(pRootGraphics);
 	}
-
-	GraphicsPipelineState pso;
-	pso.SetVertexShader(L"Shaders/simpleVertex.hlsl");
-	pso.SetPixelShader(L"Shaders/simplePixel.hlsl");
-	pso.SetWireFrame(false);
-	pso.Finalize(device.GetDevice(), pRootSignature.Get());
-
-	GraphicsPipelineState psoLines;
-	psoLines.SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
-	psoLines.SetVertexShader(L"Shaders/simpleVertex.hlsl");
-	psoLines.SetPixelShader(L"Shaders/simplePixel.hlsl");
-	psoLines.Finalize(device.GetDevice(), pRootSignature.Get());
 
 	FrameManager fm(device.GetDevice());
 	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
-	ComPtr<ID3D12DescriptorHeap> pDSVHeap;
-
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-
-	dsvHeapDesc.NumDescriptors = 1;
-	dsvHeapDesc.Type		   = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	dsvHeapDesc.Flags		   = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	TIF(device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&pDSVHeap)));
-	NAME_D3D12_OBJECT(pDSVHeap);
-
-	ComPtr<ID3D12Resource> pDepthResource;
-
-	D3D12_HEAP_PROPERTIES hp;
-	hp.Type					= D3D12_HEAP_TYPE_DEFAULT;
-	hp.CPUPageProperty		= D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	hp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	hp.CreationNodeMask		= 1;
-	hp.VisibleNodeMask		= 1;
-
-	D3D12_RESOURCE_DESC rd = {};
-	rd.Dimension		   = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	rd.Alignment		   = 0;
-	rd.Width			   = window.GetWidth();
-	rd.Height			   = window.GetHeight();
-	rd.DepthOrArraySize	= 1;
-	rd.MipLevels		   = 0;
-	rd.SampleDesc.Count	= 1;
-	rd.SampleDesc.Quality  = 0;
-	rd.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-	rd.Layout			   = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	rd.Format			   = DXGI_FORMAT_D32_FLOAT;
-
-	D3D12_CLEAR_VALUE depthOp	= {};
-	depthOp.Format				 = DXGI_FORMAT_D32_FLOAT;
-	depthOp.DepthStencil.Depth   = 1;
-	depthOp.DepthStencil.Stencil = 0;
-
-	TIF(device->CreateCommittedResource(&hp,
-										D3D12_HEAP_FLAG_NONE,
-										&rd,
-										D3D12_RESOURCE_STATE_DEPTH_WRITE,
-										&depthOp,
-										IID_PPV_ARGS(&pDepthResource)));
-
-	D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
-	depthStencilDesc.Format						   = DXGI_FORMAT_D32_FLOAT;
-	depthStencilDesc.ViewDimension				   = D3D12_DSV_DIMENSION_TEXTURE2D;
-	depthStencilDesc.Flags						   = D3D12_DSV_FLAG_NONE;
-
-	device->CreateDepthStencilView(
-		pDepthResource.Get(), &depthStencilDesc, pDSVHeap->GetCPUDescriptorHandleForHeapStart());
-
 	OBJLoader obj;
-	/*CURRENT_VALUES ret = obj.loadObj("Assets/bunny.obj");
+
+	CURRENT_VALUES ret = obj.loadObj("Assets/cube.obj");
 
 	std::vector<XMFLOAT3> v;
 	for(int i = 0; i < ret.vertexIndices.size(); i++)
 	{
 		v.push_back(ret.out_vertices[ret.vertexIndices[i]]);
 		v.push_back(ret.out_normals[ret.normalIndices[i]]);
-	}*/
-	float vect[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 0.5f};
+	}
 
-	float vertices[] = {-0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
-						0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+	size_t size = v.size() * sizeof(XMFLOAT3);
+	VERTEX_BUFFER_DESC vbDesc;
+	vbDesc.pData		 = v.data();
+	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
+	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
+	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc);
 
-						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-						0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-						-0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
-
-						-0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
-						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
-
-						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-						0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
-						0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-						-0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
-						0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-						-0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-
-						-0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-						0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-						-0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
-	//size_t size		 = v.size() * sizeof(XMFLOAT3);
-	//	VertexBuffer vb(device.GetDevice(), reinterpret_cast<LPVOID>(&v[0]), size);
+	GraphicsPipelineState gps;
+	auto desc	 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	desc.CullMode = D3D12_CULL_MODE_FRONT;
+	gps.SetRasterizerState(desc);
+	gps.SetPixelShader(L"Shaders/CubePS.hlsl");
+	gps.SetVertexShader(L"Shaders/CubeVS.hlsl");
+	gps.Finalize(device.GetDevice(), pRootGraphics.Get());
 
 	// Generate grid
-	const int hw	  = 100;
-	const int step	= 5;
-	const int bigstep = 100;
-	int i			  = 0;
-
-	std::vector<XMFLOAT3> gridVerts;
-	for(i = -hw; i <= hw; i += step)
-	{
-		float hwf = static_cast<float>(hw);
-		float ii  = static_cast<float>(i);
-		XMFLOAT3 p0{ii, 0, -hwf};
-		XMFLOAT3 p1{ii, 0, hwf};
-
-		XMFLOAT3 p2{-hwf, 0, ii};
-		XMFLOAT3 p3{hwf, 0, ii};
-
-		gridVerts.push_back(p0);
-		gridVerts.push_back(p1);
-		gridVerts.push_back(p2);
-		gridVerts.push_back(p3);
-	}
-	size_t gridSizeBytes = gridVerts.size() * sizeof(XMFLOAT3);
-
-	VERTEX_BUFFER_DESC vbd;
-	vbd.pData		  = reinterpret_cast<LPVOID>(&gridVerts[0]);
-	vbd.SizeInBytes   = gridSizeBytes;
-	vbd.StrideInBytes = sizeof(XMFLOAT3);
-	VertexBuffer vb(device.GetDevice(), &vbd);
-
-	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-	cbvHeapDesc.NumDescriptors			   = 1;
-	cbvHeapDesc.Flags					   = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	cbvHeapDesc.Type					   = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	TIF(device.GetDevice()->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&g_cbvHeap)));
-
-	struct DATA
-	{
-		DirectX::XMFLOAT4 pos;
-	};
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1);
 
 	FPSCamera camera;
-
-	DATA lol;
-	lol.pos = {0, 0, 0, 0};
-
-	ConstantBuffer buffer(device.GetDevice(), g_cbvHeap.Get(), sizeof(DATA));
-	buffer.SetData(&lol);
+	camera.setPosition({0, 5, 0});
 
 	D3D12_VIEWPORT vp;
 	vp.TopLeftX = 0.0f;
@@ -252,9 +144,224 @@ int main(int, char**)
 	scissor.top	= 0;
 	scissor.bottom = vp.Height;
 
-	float x = 0;
-	float y = 0;
-	float z = 0;
+	ComPtr<ID3D12RootSignature> pRootCompute;
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		if(FAILED(device->CheckFeatureSupport(
+			   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+
+		D3D12_DESCRIPTOR_RANGE1 ranges[2];
+		ranges[0].RangeType			 = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+		ranges[0].NumDescriptors	 = 1;
+		ranges[0].BaseShaderRegister = 0;
+		ranges[0].RegisterSpace		 = 0;
+		ranges[0].Flags				 = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		ranges[1].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+		ranges[1].NumDescriptors					= 1;
+		ranges[1].BaseShaderRegister				= 0;
+		ranges[1].RegisterSpace						= 0;
+		ranges[1].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+		ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+		D3D12_ROOT_PARAMETER1 rootParameters[2];
+		rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+		rootParameters[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
+		rootParameters[0].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
+
+		rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+		rootParameters[1].DescriptorTable.pDescriptorRanges   = &ranges[1];
+		rootParameters[1].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
+
+		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
+		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
+		rootSig.Desc_1_1.pParameters	   = rootParameters;
+		rootSig.Desc_1_1.NumStaticSamplers = 0;
+		rootSig.Desc_1_1.pStaticSamplers   = nullptr;
+		rootSig.Desc_1_1.Flags			   = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+
+		TIF(D3DX12SerializeVersionedRootSignature(
+			&rootSig, featureData.HighestVersion, &signature, &error));
+		if(error)
+		{
+			std::cout << (char*)error->GetBufferPointer() << std::endl;
+		}
+		TIF(device->CreateRootSignature(0,
+										signature->GetBufferPointer(),
+										signature->GetBufferSize(),
+										IID_PPV_ARGS(&pRootCompute)));
+
+		NAME_D3D12_OBJECT(pRootCompute);
+	}
+
+	ComPtr<ID3DBlob> computeBlob;
+	TIF(D3DCompileFromFile(L"Shaders/ComputeShader.hlsl",
+						   nullptr,
+						   nullptr,
+						   "CS_main",
+						   "cs_5_1",
+						   0,
+						   0,
+						   &computeBlob,
+						   nullptr));
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
+	cpsd.pRootSignature					   = pRootCompute.Get();
+	cpsd.CS.pShaderBytecode				   = computeBlob->GetBufferPointer();
+	cpsd.CS.BytecodeLength				   = computeBlob->GetBufferSize();
+	cpsd.NodeMask						   = 0;
+	ComPtr<ID3D12PipelineState> pComputePipeline;
+	TIF(device->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&pComputePipeline)));
+
+	ComPtr<ID3D12CommandAllocator> pComputeAllocator;
+	ComPtr<ID3D12GraphicsCommandList> pComputeList;
+
+	ComputeQueue computeQueue(device.GetDevice());
+	TIF(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE,
+									   IID_PPV_ARGS(&pComputeAllocator)));
+	NAME_D3D12_OBJECT(pComputeAllocator);
+	device->CreateCommandList(0,
+							  D3D12_COMMAND_LIST_TYPE_COMPUTE,
+							  pComputeAllocator.Get(),
+							  nullptr,
+							  IID_PPV_ARGS(&pComputeList));
+	pComputeList->Close();
+
+	D3D12_DESCRIPTOR_HEAP_DESC srvUavHeapDesc = {};
+	srvUavHeapDesc.NumDescriptors			  = 2;
+	srvUavHeapDesc.Type						  = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	srvUavHeapDesc.Flags					  = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	TIF(device->CreateDescriptorHeap(&srvUavHeapDesc, IID_PPV_ARGS(&g_Heap)));
+	NAME_D3D12_OBJECT(g_Heap);
+
+	float data = 1.0f;
+
+	D3D12_HEAP_PROPERTIES uploadHeap = {};
+	uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	uploadHeap.CreationNodeMask		 = 1;
+	uploadHeap.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+	uploadHeap.Type					 = D3D12_HEAP_TYPE_UPLOAD;
+	uploadHeap.VisibleNodeMask		 = 1;
+
+	D3D12_RESOURCE_DESC uploadBufferDesc = {};
+	uploadBufferDesc.Alignment			 = 0;
+	uploadBufferDesc.DepthOrArraySize	= 1;
+	uploadBufferDesc.Dimension			 = D3D12_RESOURCE_DIMENSION_BUFFER;
+	uploadBufferDesc.Flags				 = D3D12_RESOURCE_FLAG_NONE;
+	uploadBufferDesc.Format				 = DXGI_FORMAT_UNKNOWN;
+	uploadBufferDesc.Height				 = 1;
+	uploadBufferDesc.Width				 = sizeof(data);
+	uploadBufferDesc.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	uploadBufferDesc.MipLevels			 = 1;
+	uploadBufferDesc.SampleDesc.Count	= 1;
+
+	D3D12_HEAP_PROPERTIES defaultHeap = {};
+	defaultHeap.CPUPageProperty		  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	defaultHeap.CreationNodeMask	  = 1;
+	defaultHeap.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+	defaultHeap.Type				  = D3D12_HEAP_TYPE_DEFAULT;
+	defaultHeap.VisibleNodeMask		  = 1;
+
+	D3D12_RESOURCE_DESC bufferDesc = {};
+	bufferDesc.Alignment		   = 0;
+	bufferDesc.DepthOrArraySize	= 1;
+	bufferDesc.Dimension		   = D3D12_RESOURCE_DIMENSION_BUFFER;
+	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
+	bufferDesc.Height			   = 1;
+	bufferDesc.Width			   = sizeof(data);
+	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	bufferDesc.MipLevels		   = 1;
+	bufferDesc.SampleDesc.Count	= 1;
+
+	ComPtr<ID3D12Resource> posbuffer;
+	TIF(device->CreateCommittedResource(&defaultHeap,
+										D3D12_HEAP_FLAG_NONE,
+										&bufferDesc,
+										D3D12_RESOURCE_STATE_COPY_DEST,
+										nullptr,
+										IID_PPV_ARGS(&posbuffer)));
+	NAME_D3D12_OBJECT(posbuffer);
+
+	ComPtr<ID3D12Resource> uploadPosBuffer;
+	TIF(device->CreateCommittedResource(&uploadHeap,
+										D3D12_HEAP_FLAG_NONE,
+										&uploadBufferDesc,
+										D3D12_RESOURCE_STATE_GENERIC_READ,
+										nullptr,
+										IID_PPV_ARGS(&uploadPosBuffer)));
+
+	UINT64 requiredSize = 0;
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts;
+	UINT NumRows;
+	UINT64 RowSizeInBytes;
+
+	D3D12_RESOURCE_DESC resDesc = posbuffer->GetDesc();
+
+	device->GetCopyableFootprints(
+		&resDesc, 0, 1, 0, &layouts, &NumRows, &RowSizeInBytes, &requiredSize);
+
+	BYTE* pData;
+	TIF(uploadPosBuffer->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+
+	memcpy(pData, &data, sizeof(data));
+
+	uploadPosBuffer->Unmap(0, nullptr);
+	cl->CopyBufferRegion(
+		posbuffer.Get(), 0, uploadPosBuffer.Get(), layouts.Offset, layouts.Footprint.Width);
+
+	D3D12_RESOURCE_BARRIER barrier;
+	barrier.Transition.pResource   = posbuffer.Get();
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	barrier.Transition.Subresource = 0;
+	barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	cl->ResourceBarrier(1, &barrier);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Buffer.FirstElement				= 0;
+	srvDesc.Buffer.NumElements				= 1;
+	srvDesc.Buffer.StructureByteStride		= sizeof(float);
+	srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
+	srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
+	srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
+
+	device->CreateShaderResourceView(
+		posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
+	uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
+	uavDesc.Buffer.FirstElement				 = 0;
+	uavDesc.Buffer.NumElements				 = 1;
+	uavDesc.Buffer.StructureByteStride		 = sizeof(float);
+	uavDesc.Buffer.CounterOffsetInBytes		 = 0;
+	uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
+
+	auto offHeap = g_Heap->GetCPUDescriptorHandleForHeapStart();
+	UINT descSize =
+		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	offHeap.ptr += descSize;
+	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
+
+	cl->Close();
+	CommandQueue.SubmitList(cl.GetPtr());
+	CommandQueue.Execute();
+	fm.WaitForLastSubmittedFrame();
+
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
 
@@ -271,8 +378,6 @@ int main(int, char**)
 		{
 			wireframe = !wireframe;
 			fm.WaitForLastSubmittedFrame();
-			pso.SetWireFrame(wireframe);
-			pso.Finalize(device.GetDevice(), pRootSignature.Get());
 		}
 
 		// Camera stuff
@@ -292,12 +397,12 @@ int main(int, char**)
 			float dx  = (currMousePos.x - prevMouse.x) * 0.6f;
 			float dy  = (currMousePos.y - prevMouse.y) * 0.6f;
 			prevMouse = currMousePos;
-			if(Input::IsKeyPressed(VK_RBUTTON))
+			if(Input::IsKeyPressed(VK_LBUTTON))
 			{
 				camera.rotate(-dx * deltaTime, -dy * deltaTime);
 			}
 
-			float speed = Input::IsKeyPressed(VK_SHIFT) ? 40 : 20;
+			float speed = Input::IsKeyPressed(VK_SHIFT) ? 10 : 5;
 			if(GetAsyncKeyState('W'))
 				camMovement -= camRotMat.r[2] * deltaTime * speed;
 			if(GetAsyncKeyState('S'))
@@ -315,33 +420,67 @@ int main(int, char**)
 			camera.update(deltaTime);
 		}
 
-		buffer.SetData(&lol);
+		// Compute
+		TIF(pComputeAllocator->Reset());
+		TIF(pComputeList->Reset(pComputeAllocator.Get(), pComputePipeline.Get()));
+
+		D3D12_RESOURCE_BARRIER srvToUav = {};
+		srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		srvToUav.Transition.pResource   = posbuffer.Get();
+		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		pComputeList->ResourceBarrier(1, &srvToUav);
+
+		pComputeList->SetComputeRootSignature(pRootCompute.Get());
+		ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
+		pComputeList->SetDescriptorHeaps(_countof(ppHeaps2), ppHeaps2);
+
+		auto SrvHandle = g_Heap->GetGPUDescriptorHandleForHeapStart();
+		auto UavHandle = g_Heap->GetGPUDescriptorHandleForHeapStart();
+		UavHandle.ptr += descSize;
+
+		pComputeList->SetComputeRootDescriptorTable(0, SrvHandle);
+		pComputeList->SetComputeRootDescriptorTable(1, UavHandle);
+
+		pComputeList->Dispatch(1, 1, 1);
+
+		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		pComputeList->ResourceBarrier(1, &srvToUav);
+
+		TIF(pComputeList->Close());
+		computeQueue.SubmitList(pComputeList.Get());
+		computeQueue.Execute();
+		computeQueue.WaitForGPU();
+
 		// Rendering
 		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 		TIF(frameCtxt->GetCommandAllocator()->Reset());
 
 		cl.Prepare(frameCtxt->GetCommandAllocator(), sc.GetCurrentRenderTarget());
+
 		cl->OMSetRenderTargets(
-			1, &sc.GetCurrentDescriptor(), true, &pDSVHeap->GetCPUDescriptorHandleForHeapStart());
-		cl->ClearDepthStencilView(pDSVHeap->GetCPUDescriptorHandleForHeapStart(),
-								  D3D12_CLEAR_FLAG_DEPTH,
-								  1.0f,
-								  0,
-								  0,
-								  nullptr);
+			1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
+		ds.Clear(cl.GetPtr());
 		cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
 
-		cl->SetGraphicsRootSignature(pRootSignature.Get());
-		cl->SetGraphicsRootConstantBufferView(0, buffer.GetVirtualAddress());
+		cl->SetGraphicsRootSignature(pRootGraphics.Get());
 		cl->SetGraphicsRoot32BitConstants(
 			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
-		cl->SetPipelineState(psoLines.GetPtr());
+		cl->SetGraphicsRootShaderResourceView(2, posbuffer->GetGPUVirtualAddress());
 
 		cl->RSSetViewports(1, &vp);
 		cl->RSSetScissorRects(1, &scissor);
-		cl->IASetVertexBuffers(0, 1, &vb.GetVertexView());
-		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-		cl->DrawInstanced(gridVerts.size(), 1, 0, 0);
+
+		// Draw cube
+		cl->SetPipelineState(gps.GetPtr());
+		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
+		cl->DrawInstanced(boxBuffer.GetVertexCount(), 1, 0, 0);
+
+		// Draw Grid
+		grid.Draw(cl.GetPtr());
 
 		ImguiDraw(cl.GetPtr());
 
@@ -396,52 +535,13 @@ void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle)
 void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 {
 
-	static bool show_demo_window	= true;
-	static bool show_another_window = false;
-
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	/*if(show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);*/
-
-	// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 	{
-		static float f	 = 0.0f;
-		static int counter = 0;
 
-		ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-		ImGui::Text(
-			"This is some useful text."); // Display some text (you can use a format strings too)
-		ImGui::Checkbox("Demo Window",
-						&show_demo_window); // Edit bools storing our window open/close state
-		ImGui::Checkbox("Another Window", &show_another_window);
-
-		ImGui::SliderFloat(
-			"float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-		ImGui::ColorEdit3("clear color",
-						  (float*)&clear_color); // Edit 3 floats representing a color
-
-		if(ImGui::Button(
-			   "Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-			counter++;
-		ImGui::SameLine();
-		ImGui::Text("counter = %d", counter);
+		ImGui::Begin("FPS"); // Create a window called "Hello, world!" and append into it.
 
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
 					1000.0f / ImGui::GetIO().Framerate,
 					ImGui::GetIO().Framerate);
-		ImGui::End();
-	}
-
-	// 3. Show another simple window.
-	if(show_another_window)
-	{
-		ImGui::Begin(
-			"Another Window",
-			&show_another_window); // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-		ImGui::Text("Hello from another window!");
-		if(ImGui::Button("Close Me"))
-			show_another_window = false;
 		ImGui::End();
 	}
 }

@@ -35,7 +35,7 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 {
 	// Check for multisampling
 	int i = 0;
-	for( i= 4; i > 1; i--)
+	for(i = 4; i > 1; i--)
 	{
 		D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS levels = {DXGI_FORMAT_R8G8B8A8_UNORM, i};
 		if(FAILED(_pDevice->CheckFeatureSupport(

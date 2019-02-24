@@ -5,7 +5,8 @@ class GraphicsPipelineState
 public:
 	GraphicsPipelineState();
 
-
+	void SetDepthStencilState(D3D12_DEPTH_STENCIL_DESC _Desc);
+	void SetRasterizerState(D3D12_RASTERIZER_DESC _Desc);
 	void SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE _topology);
 	void SetVertexShader(LPCWSTR _pFileName,
 						 LPCSTR _pEntryPoint = "vs_main",

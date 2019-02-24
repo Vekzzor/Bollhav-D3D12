@@ -64,9 +64,18 @@ CURRENT_VALUES OBJLoader::loadObj(const char* path)
 				unsigned int vertexIndex[3], uvIndex[3], normalIndex[3];
 				char trash;
 
-				objFile >> vertexIndex[0] >> trash >> uvIndex[0] >> trash >> normalIndex[0] >>
-					vertexIndex[1] >> trash >> uvIndex[0] >> trash >> normalIndex[1] >>
-					vertexIndex[2] >> trash >> uvIndex[0] >> trash >> normalIndex[2];
+				if(vFound && vtFound && nFound)
+				{
+					objFile >> vertexIndex[0] >> trash >> uvIndex[0] >> trash >> normalIndex[0] >>
+						vertexIndex[1] >> trash >> uvIndex[0] >> trash >> normalIndex[1] >>
+						vertexIndex[2] >> trash >> uvIndex[0] >> trash >> normalIndex[2];
+				}
+				else if(vFound && nFound)
+				{
+					objFile >> vertexIndex[0] >> trash >> trash >> normalIndex[0] >>
+						vertexIndex[1] >> trash >> trash >> normalIndex[1] >> vertexIndex[2] >>
+						trash >> trash >> normalIndex[2];
+				}
 
 				/*objFile >> vertexIndex[0] >> trash >> trash >> normalIndex[0] >> vertexIndex[1] >>
 					trash >> trash >> normalIndex[1] >> vertexIndex[2] >> trash >> trash >>

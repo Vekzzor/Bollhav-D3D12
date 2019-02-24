@@ -5,7 +5,9 @@ CommandList::CommandList(ID3D12Device4* _pDevice, ID3D12CommandAllocator* _pInit
 {
 	TIF(_pDevice->CreateCommandList(
 		0, D3D12_COMMAND_LIST_TYPE_DIRECT, _pInitialAlloc, nullptr, IID_PPV_ARGS(&m_pCommandList)));
-	TIF(m_pCommandList->Close());
+
+	// TODO(Henrik): Pass a bool if it should be closed
+	//TIF(m_pCommandList->Close());
 
 	NAME_D3D12_OBJECT(m_pCommandList);
 }
@@ -24,7 +26,7 @@ void CommandList::Prepare(ID3D12CommandAllocator* _pAllocator, ID3D12Resource* _
 	m_pCommandList->ResourceBarrier(1, &barrier);
 }
 
-void CommandList::Finish() 
+void CommandList::Finish()
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
