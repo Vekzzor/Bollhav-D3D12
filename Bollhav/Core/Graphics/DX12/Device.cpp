@@ -5,12 +5,12 @@ Device::Device()
 
 	ComPtr<ID3D12Debug> debugController;
 	UINT dxgiFactoryFlags = 0;
-	if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	/*if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 	{
 		debugController->EnableDebugLayer();
 		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 	}
-	ComPtr<ID3D12Debug1> debugcontroller1;
+	ComPtr<ID3D12Debug1> debugcontroller1;*/
 	/*debugController->QueryInterface(IID_PPV_ARGS(&debugcontroller1));
 	debugcontroller1->SetEnableGPUBasedValidation(true);*/
 

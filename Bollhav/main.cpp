@@ -256,26 +256,25 @@ int main(int, char**)
 		float x, y, z; // Position
 		float vx, vy, vz; // Velocity
 	};
-	DATA positions[4];
-	positions[0].x = -5;
-	positions[0].y = 0;
-	positions[0].z = 0;
-	positions[0].vx = positions[0].vy = positions[0].vz = 1.1f;
 
-	positions[1].x = 5;
-	positions[1].y = 0;
-	positions[1].z = 0;
-	positions[1].vx = positions[1].vy = positions[1].vz = 1.0f;
+	constexpr UINT nCubes = 1024;
 
-	positions[2].x = 0;
-	positions[2].y = 0;
-	positions[2].z = 5;
-	positions[2].vx = positions[2].vy = positions[2].vz = 1.0f;
+	DATA positions[nCubes];
+	for(int i = 0; i < nCubes; i++)
+	{
+		float rand_y	= rand() / RAND_MAX;
+		float rand_x	= rand() / RAND_MAX;
 
-	positions[3].x = 0;
-	positions[3].y = 0;
-	positions[3].z = -5;
-	positions[3].vx = positions[3].vy = positions[3].vz = 1.0f;
+		float ii	   = static_cast<float>(i);
+		positions[i].x = (rand() % 10) - 5;
+		
+		positions[i].y = (rand() % 10) - 5;
+		positions[i].z = (rand() % 10) - 5;
+
+		positions[i].vx = rand_y * 0.001f;
+		positions[i].vy = -rand_x * 0.001f;
+		positions[i].vz = 0.0f;
+	}
 
 	D3D12_HEAP_PROPERTIES uploadHeap = {};
 	uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
