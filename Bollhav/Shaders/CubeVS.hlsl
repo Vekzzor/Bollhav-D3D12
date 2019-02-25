@@ -4,7 +4,12 @@ struct VertexIn
     float3 normal : NORMAL;
 };
 
-StructuredBuffer<float> test : register(t0);
+struct DATA
+{
+    float3 pos;
+    float3 vel;
+};
+StructuredBuffer<DATA> test : register(t0);
 
 cbuffer projection : register(b1)
 {
@@ -18,11 +23,11 @@ struct VertexOut
     float3 normal : NORMAL;
 };
 
-VertexOut vs_main(VertexIn input)
+VertexOut vs_main(in VertexIn input, in uint instanceID : SV_InstanceID)
 {
     VertexOut output;
     output.position = float4(input.position, 1.0f);
-    output.position.x += test[0];
+    output.position.xyz += test[instanceID].pos.xyz;
     output.worldPosition = output.position.xyz;
     output.position = mul(matIndex, output.position);
     output.normal = input.normal;

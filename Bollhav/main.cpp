@@ -66,18 +66,24 @@ int main(int, char**)
 		rootParameters[1].Constants.ShaderRegister = 1;
 		rootParameters[1].Constants.RegisterSpace  = 0;
 
-		rootParameters[2].ParameterType	= D3D12_ROOT_PARAMETER_TYPE_SRV;
-		rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParameters[2].Descriptor.Flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-		rootParameters[2].Descriptor.RegisterSpace = 0;
+		rootParameters[2].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_SRV;
+		rootParameters[2].ShaderVisibility			= D3D12_SHADER_VISIBILITY_VERTEX;
+		rootParameters[2].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+		rootParameters[2].Descriptor.RegisterSpace  = 0;
 		rootParameters[2].Descriptor.ShaderRegister = 0;
-		
+
+		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+		samplerDesc.Filter					  = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		samplerDesc.AddressU				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressV				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDesc.AddressW				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
 		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
 		rootSig.Desc_1_1.pParameters	   = rootParameters;
-		rootSig.Desc_1_1.NumStaticSamplers = 0;
-		rootSig.Desc_1_1.pStaticSamplers   = nullptr;
+		rootSig.Desc_1_1.NumStaticSamplers = 1;
+		rootSig.Desc_1_1.pStaticSamplers   = &samplerDesc;
 		rootSig.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 		ComPtr<ID3DBlob> signature;
@@ -245,7 +251,31 @@ int main(int, char**)
 	TIF(device->CreateDescriptorHeap(&srvUavHeapDesc, IID_PPV_ARGS(&g_Heap)));
 	NAME_D3D12_OBJECT(g_Heap);
 
-	float data = -1.0f;
+	struct DATA
+	{
+		float x, y, z; // Position
+		float vx, vy, vz; // Velocity
+	};
+	DATA positions[4];
+	positions[0].x = -5;
+	positions[0].y = 0;
+	positions[0].z = 0;
+	positions[0].vx = positions[0].vy = positions[0].vz = 1.1f;
+
+	positions[1].x = 5;
+	positions[1].y = 0;
+	positions[1].z = 0;
+	positions[1].vx = positions[1].vy = positions[1].vz = 1.0f;
+
+	positions[2].x = 0;
+	positions[2].y = 0;
+	positions[2].z = 5;
+	positions[2].vx = positions[2].vy = positions[2].vz = 1.0f;
+
+	positions[3].x = 0;
+	positions[3].y = 0;
+	positions[3].z = -5;
+	positions[3].vx = positions[3].vy = positions[3].vz = 1.0f;
 
 	D3D12_HEAP_PROPERTIES uploadHeap = {};
 	uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -261,7 +291,7 @@ int main(int, char**)
 	uploadBufferDesc.Flags				 = D3D12_RESOURCE_FLAG_NONE;
 	uploadBufferDesc.Format				 = DXGI_FORMAT_UNKNOWN;
 	uploadBufferDesc.Height				 = 1;
-	uploadBufferDesc.Width				 = sizeof(data);
+	uploadBufferDesc.Width				 = sizeof(positions);
 	uploadBufferDesc.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	uploadBufferDesc.MipLevels			 = 1;
 	uploadBufferDesc.SampleDesc.Count	= 1;
@@ -280,7 +310,7 @@ int main(int, char**)
 	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
 	bufferDesc.Height			   = 1;
-	bufferDesc.Width			   = sizeof(data);
+	bufferDesc.Width			   = sizeof(positions);
 	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
@@ -315,7 +345,7 @@ int main(int, char**)
 	BYTE* pData;
 	TIF(uploadPosBuffer->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
 
-	memcpy(pData, &data, sizeof(data));
+	memcpy(pData, &positions[0], sizeof(DATA) * ARRAYSIZE(positions));
 
 	uploadPosBuffer->Unmap(0, nullptr);
 	cl->CopyBufferRegion(
@@ -330,10 +360,15 @@ int main(int, char**)
 	barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	cl->ResourceBarrier(1, &barrier);
 
+	cl->Close();
+	CommandQueue.SubmitList(cl.GetPtr());
+	CommandQueue.Execute();
+	CommandQueue.WaitForGPU();
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
-	srvDesc.Buffer.NumElements				= 1;
-	srvDesc.Buffer.StructureByteStride		= sizeof(float);
+	srvDesc.Buffer.NumElements				= ARRAYSIZE(positions);
+	srvDesc.Buffer.StructureByteStride		= sizeof(DATA);
 	srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
 	srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
@@ -346,8 +381,8 @@ int main(int, char**)
 	uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
 	uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
 	uavDesc.Buffer.FirstElement				 = 0;
-	uavDesc.Buffer.NumElements				 = 1;
-	uavDesc.Buffer.StructureByteStride		 = sizeof(float);
+	uavDesc.Buffer.NumElements				 = ARRAYSIZE(positions);
+	uavDesc.Buffer.StructureByteStride		 = sizeof(DATA);
 	uavDesc.Buffer.CounterOffsetInBytes		 = 0;
 	uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
 
@@ -356,11 +391,6 @@ int main(int, char**)
 		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	offHeap.ptr += descSize;
 	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
-
-	cl->Close();
-	CommandQueue.SubmitList(cl.GetPtr());
-	CommandQueue.Execute();
-	fm.WaitForLastSubmittedFrame();
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
@@ -443,7 +473,7 @@ int main(int, char**)
 		pComputeList->SetComputeRootDescriptorTable(0, SrvHandle);
 		pComputeList->SetComputeRootDescriptorTable(1, UavHandle);
 
-		pComputeList->Dispatch(1, 1, 1);
+		pComputeList->Dispatch(ARRAYSIZE(positions), 1, 1);
 
 		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
@@ -477,7 +507,7 @@ int main(int, char**)
 		cl->SetPipelineState(gps.GetPtr());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
-		cl->DrawInstanced(boxBuffer.GetVertexCount(), 1, 0, 0);
+		cl->DrawInstanced(boxBuffer.GetVertexCount(), ARRAYSIZE(positions), 0, 0);
 
 		// Draw Grid
 		grid.Draw(cl.GetPtr());
