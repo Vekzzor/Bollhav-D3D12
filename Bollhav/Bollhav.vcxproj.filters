@@ -26,6 +26,7 @@
     <ClCompile Include="Core\Graphics\ConstantBuffer.cpp" />
     <ClCompile Include="Core\Camera\FPSCamera.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="CopyList.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Graphics\CommandList.h" />
@@ -55,6 +56,7 @@
     <ClInclude Include="Core\Graphics\GraphicsPipelineState.h" />
     <ClInclude Include="Core\Graphics\VertexBuffer.h" />
     <ClInclude Include="Core\Camera\FPSCamera.h" />
+    <ClInclude Include="CopyList.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\simpleVertex.hlsl" />

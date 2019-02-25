@@ -46,3 +46,8 @@ const D3D12_VERTEX_BUFFER_VIEW& VertexBuffer::GetVertexView() const
 {
 	return m_BufferView;
 }
+
+const ID3D12Resource* VertexBuffer::GetVertexData() const
+{
+	return m_pVertexData.Get();
+}
