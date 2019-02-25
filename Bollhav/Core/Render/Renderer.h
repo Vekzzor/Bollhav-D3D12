@@ -1,5 +1,5 @@
 #pragma once
-#include <ObjLoader.h>
+#include <Utility/ObjLoader.h>
 
 static const UINT NUMOFBUFFERS = 2;
 

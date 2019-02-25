@@ -1,5 +1,4 @@
 #include "GPUComputing.h"
-#include "pch.h"
 
 GPUComputing::GPUComputing() {}
 

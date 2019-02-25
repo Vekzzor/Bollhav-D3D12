@@ -40,14 +40,14 @@ void FPSCamera::update(float deltaTime)
 
 	view_ = translation_mat * rotation_mat;
 
-	projection_ = XMMatrixPerspectiveFovRH(3.14f * 0.2f, 1920.0f / 1080.0f, 0.001f, 100.0f);
+	projection_ = XMMatrixPerspectiveFovRH(3.14f * 0.2f, 1920.0f / 1080.0f, 0.001f, 1000.0f);
 }
 
 void FPSCamera::update(float deltaTime, XMVECTOR position, XMVECTOR lookAt, XMVECTOR upVec)
 {
 	view_ = XMMatrixLookAtLH(position, lookAt, upVec);
 
-	projection_ = XMMatrixPerspectiveFovRH(3.14f * 0.2f, 1920.0f / 1080.0f, 0.1f, 100.0f);
+	projection_ = XMMatrixPerspectiveFovRH(3.14f * 0.2f, 1920.0f / 1080.0f, 0.1f, 1000.0f);
 }
 
 void FPSCamera::setPosition(XMVECTOR position)
