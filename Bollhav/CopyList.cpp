@@ -3,19 +3,36 @@
 
 CopyList::CopyList(ID3D12Device4* pDevice, ID3D12CommandAllocator* pCommandAlloc)
 {
+	//Create command allocator
+	pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
+									IID_PPV_ARGS(&m_commandAllocator)); 
 	//CopyList creation.
 	TIF(pDevice->CreateCommandList(
 		0, D3D12_COMMAND_LIST_TYPE_COPY, pCommandAlloc, nullptr, IID_PPV_ARGS(&m_pCopyList)));
 
+	m_pCopyList->Close(); 
+
 	NAME_D3D12_OBJECT(m_pCopyList);
 }
 
-void CopyList::Prepare(ID3D12CommandAllocator* pAllocator, ID3D12Resource* vertexBuffer)
+void CopyList::Prepare(ID3D12Resource* vertexBuffer)
 {
-	//Create vertexbuffer resource and upload heap.
+	
 }
 
-void CopyList::Finish() {}
+void CopyList::Finish(ID3D12Resource* vertexData) 
+{
+	//Change the barrier
+	m_pCopyList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(vertexData,
+											  D3D12_RESOURCE_STATE_COPY_DEST,
+											  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+											  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+											  D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY));
+	ResetCopyAllocator(); 
+	ResetCopyList(); 
+}
 
 ID3D12GraphicsCommandList* CopyList::operator->(void)
 {
@@ -28,8 +45,7 @@ ID3D12GraphicsCommandList* CopyList::GetPtr()
 }
 
 HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice,
-								   UINT dataSize,
-								   ID3D12Resource1* UploadHeapResource)
+								   UINT dataSize)
 {
 	//I know TIF takes care of this but let me do it anyway. 
 
@@ -55,7 +71,7 @@ HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice,
 											   &rd,
 											   D3D12_RESOURCE_STATE_GENERIC_READ,
 											   nullptr,
-											   IID_PPV_ARGS(&UploadHeapResource)));
+											   IID_PPV_ARGS(&m_pUploadHeapResource)));
 
 	return hrU;
 }
@@ -68,5 +84,31 @@ void CopyList::ScheduleCopy(VertexBuffer* vertexData)
 	vbData.RowPitch   = vertexData->GetVertexView().SizeInBytes;
 	vbData.SlicePitch = vbData.RowPitch;
 
+	//Schedule copy
+	UpdateSubresources<1>(
+		m_pCopyList.Get(), vertexData->GetVertexData(), m_pUploadHeapResource.Get(), 0, 0, 1, &vbData); 
 	
+	//Close CopyList
+	m_pCopyList->Close(); 
 }
+
+void CopyList::ExecuteCopy(ID3D12CommandQueue* commandQueue) 
+{
+	executeList.push_back(m_pCopyList.Get()); 
+	commandQueue->ExecuteCommandLists(static_cast<UINT>(executeList.size()), executeList.data());
+
+	executeList.clear(); 
+
+	//Make sure to wait for GPU after this function call. 
+}
+
+void CopyList::ResetCopyAllocator() 
+{
+	m_commandAllocator.Reset(); 
+}
+
+void CopyList::ResetCopyList() 
+{
+	m_pCopyList->Reset(m_commandAllocator.Get(), nullptr); 
+}
+
