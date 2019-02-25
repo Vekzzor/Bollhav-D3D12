@@ -1,4 +1,5 @@
 #pragma once
+#include "CopyList.h"
 #include <pch.h>
 struct VERTEX_BUFFER_DESC
 {
@@ -11,9 +12,9 @@ class VertexBuffer
 {
 public:
 	VertexBuffer() = default;
-	VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc);
+	VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* cpyList);
 
-	void Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc);
+	void Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* copyList);
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexView() const;
 	UINT GetVertexCount() const;

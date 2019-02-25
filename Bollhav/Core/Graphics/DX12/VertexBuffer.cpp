@@ -1,14 +1,14 @@
 #include "VertexBuffer.h"
 
-VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* cpyList)
 {
-	Create(_pDevice, _pDesc);
+	Create(_pDevice, _pDesc, cpyList);
 }
 
-void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* copyList)
 {
 	D3D12_HEAP_PROPERTIES heapProp;
-	heapProp.Type				  = D3D12_HEAP_TYPE_UPLOAD;
+	heapProp.Type				  = D3D12_HEAP_TYPE_DEFAULT;
 	heapProp.CPUPageProperty	  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
 	heapProp.CreationNodeMask	 = 1;
@@ -34,14 +34,27 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 										  nullptr,
 										  IID_PPV_ARGS(&m_pVertexData)));
 
-	UINT* pVertexDataBegin;
-	D3D12_RANGE range;
-	range.Begin = 0;
-	range.End   = 0;
-	m_pVertexData->Map(0, &range, reinterpret_cast<void**>(&pVertexDataBegin));
-	memcpy(pVertexDataBegin, _pDesc->pData, desc.Width);
-	m_pVertexData->Unmap(0, nullptr);
+	//Just something to hold the data for transfer to the GPU.
+	D3D12_SUBRESOURCE_DATA vbData;
+	vbData.pData	  = m_pVertexData.Get();
+	vbData.RowPitch   = sizeof(m_pVertexData);
+	vbData.SlicePitch = vbData.RowPitch;
 
+	//Create Upload Heap for copy. 
+	copyList->CreateUploadHeap(_pDevice, vbData.RowPitch); 
+
+	//Schedule copy
+	UpdateSubresources<1>(copyList->GetList().Get(), 
+		m_pVertexData.Get(),
+		copyList->GetUploadHeap().Get(),
+						  0,
+						  0,
+						  1,
+						  &vbData);
+	
+	copyList->GetList().Get()->Close();  
+
+	//Init view
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
 	m_BufferView.SizeInBytes	= desc.Width;
 	m_BufferView.StrideInBytes  = _pDesc->StrideInBytes;

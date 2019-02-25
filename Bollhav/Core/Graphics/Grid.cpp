@@ -1,7 +1,7 @@
 #include "Grid.h"
 #include "pch.h"
 
-Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing)
+Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing, CopyList* cpyList)
 {
 	// Create the vertices
 	std::vector<XMFLOAT3> vertices;
@@ -27,7 +27,7 @@ Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Widt
 	vbd.pData		  = reinterpret_cast<LPVOID>(vertices.data());
 	vbd.StrideInBytes = sizeof(vertices[0]);
 	vbd.SizeInBytes   = vbd.StrideInBytes * vertices.size();
-	m_VertexBuffer.Create(_pDevice, &vbd);
+	m_VertexBuffer.Create(_pDevice, &vbd, cpyList);
 
 	// Create the pipelinestate
 	m_Pipeline.SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
@@ -45,4 +45,9 @@ void Grid::Draw(ID3D12GraphicsCommandList* _pCmdList)
 	_pCmdList->IASetVertexBuffers(0, 1, &m_VertexBuffer.GetVertexView());
 	_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	_pCmdList->DrawInstanced(m_VertexBuffer.GetVertexCount(), 1, 0, 0);
+}
+
+VertexBuffer* Grid::GetVertexBuffer()
+{
+	return &m_VertexBuffer;
 }

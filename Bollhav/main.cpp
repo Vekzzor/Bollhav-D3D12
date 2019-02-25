@@ -1,3 +1,4 @@
+#include <CopyList.h>
 #include <Core/Compute/ComputeQueue.h>
 #include <Core/Compute/GPUComputing.h>
 #include <Core/Graphics/DX12/CommandList.h>
@@ -31,7 +32,11 @@ int main(int, char**)
 
 	Device device;
 	Swapchain sc(device.GetDevice());
-	GraphicsCommandQueue CommandQueue(device.GetDevice());
+	GraphicsCommandQueue CommandQueue(device.GetDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
+
+	//Copy Command Queue
+	GraphicsCommandQueue copyCommandQueue(device.GetDevice(), D3D12_COMMAND_LIST_TYPE_COPY);
+
 	sc.Init(device.GetDevice(), CommandQueue.GetCommandQueue());
 	DepthStencil ds(device.GetDevice(), window.GetWidth(), window.GetHeight());
 
@@ -102,6 +107,10 @@ int main(int, char**)
 	FrameManager fm(device.GetDevice());
 	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
 
+	CopyList cpyListVertex  = CopyList(device.GetDevice());
+	CopyList cpyListGrid	= CopyList(device.GetDevice());
+	CopyList cpyListGeneral = CopyList(device.GetDevice());
+
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
 	OBJLoader obj;
@@ -120,7 +129,7 @@ int main(int, char**)
 	vbDesc.pData		 = v.data();
 	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
 	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
-	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc);
+	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc, &cpyListVertex);
 
 	GraphicsPipelineState gps;
 	auto desc	 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -131,7 +140,7 @@ int main(int, char**)
 	gps.Finalize(device.GetDevice(), pRootGraphics.Get());
 
 	// Generate grid
-	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1);
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1, &cpyListGrid);
 
 	FPSCamera camera;
 	camera.setPosition({0, 5, 0});
@@ -257,44 +266,44 @@ int main(int, char**)
 		float vx, vy, vz; // Velocity
 	};
 	DATA positions[4];
-	positions[0].x = -5;
-	positions[0].y = 0;
-	positions[0].z = 0;
+	positions[0].x  = -5;
+	positions[0].y  = 0;
+	positions[0].z  = 0;
 	positions[0].vx = positions[0].vy = positions[0].vz = 1.1f;
 
-	positions[1].x = 5;
-	positions[1].y = 0;
-	positions[1].z = 0;
+	positions[1].x  = 5;
+	positions[1].y  = 0;
+	positions[1].z  = 0;
 	positions[1].vx = positions[1].vy = positions[1].vz = 1.0f;
 
-	positions[2].x = 0;
-	positions[2].y = 0;
-	positions[2].z = 5;
+	positions[2].x  = 0;
+	positions[2].y  = 0;
+	positions[2].z  = 5;
 	positions[2].vx = positions[2].vy = positions[2].vz = 1.0f;
 
-	positions[3].x = 0;
-	positions[3].y = 0;
-	positions[3].z = -5;
+	positions[3].x  = 0;
+	positions[3].y  = 0;
+	positions[3].z  = -5;
 	positions[3].vx = positions[3].vy = positions[3].vz = 1.0f;
 
-	D3D12_HEAP_PROPERTIES uploadHeap = {};
-	uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	uploadHeap.CreationNodeMask		 = 1;
-	uploadHeap.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
-	uploadHeap.Type					 = D3D12_HEAP_TYPE_UPLOAD;
-	uploadHeap.VisibleNodeMask		 = 1;
+	//D3D12_HEAP_PROPERTIES uploadHeap = {};
+	//uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	//uploadHeap.CreationNodeMask		 = 1;
+	//uploadHeap.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
+	//uploadHeap.Type					 = D3D12_HEAP_TYPE_UPLOAD;
+	//uploadHeap.VisibleNodeMask		 = 1;
 
-	D3D12_RESOURCE_DESC uploadBufferDesc = {};
-	uploadBufferDesc.Alignment			 = 0;
-	uploadBufferDesc.DepthOrArraySize	= 1;
-	uploadBufferDesc.Dimension			 = D3D12_RESOURCE_DIMENSION_BUFFER;
-	uploadBufferDesc.Flags				 = D3D12_RESOURCE_FLAG_NONE;
-	uploadBufferDesc.Format				 = DXGI_FORMAT_UNKNOWN;
-	uploadBufferDesc.Height				 = 1;
-	uploadBufferDesc.Width				 = sizeof(positions);
-	uploadBufferDesc.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	uploadBufferDesc.MipLevels			 = 1;
-	uploadBufferDesc.SampleDesc.Count	= 1;
+	//D3D12_RESOURCE_DESC uploadBufferDesc = {};
+	//uploadBufferDesc.Alignment			 = 0;
+	//uploadBufferDesc.DepthOrArraySize	= 1;
+	//uploadBufferDesc.Dimension			 = D3D12_RESOURCE_DIMENSION_BUFFER;
+	//uploadBufferDesc.Flags				 = D3D12_RESOURCE_FLAG_NONE;
+	//uploadBufferDesc.Format				 = DXGI_FORMAT_UNKNOWN;
+	//uploadBufferDesc.Height				 = 1;
+	//uploadBufferDesc.Width				 = sizeof(positions);
+	//uploadBufferDesc.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	//uploadBufferDesc.MipLevels			 = 1;
+	//uploadBufferDesc.SampleDesc.Count	= 1;
 
 	D3D12_HEAP_PROPERTIES defaultHeap = {};
 	defaultHeap.CPUPageProperty		  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -324,46 +333,34 @@ int main(int, char**)
 										IID_PPV_ARGS(&posbuffer)));
 	NAME_D3D12_OBJECT(posbuffer);
 
-	ComPtr<ID3D12Resource> uploadPosBuffer;
-	TIF(device->CreateCommittedResource(&uploadHeap,
-										D3D12_HEAP_FLAG_NONE,
-										&uploadBufferDesc,
-										D3D12_RESOURCE_STATE_GENERIC_READ,
-										nullptr,
-										IID_PPV_ARGS(&uploadPosBuffer)));
+	cpyListGeneral.CreateUploadHeap(device.GetDevice(), sizeof(positions));
 
-	UINT64 requiredSize = 0;
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts;
-	UINT NumRows;
-	UINT64 RowSizeInBytes;
+	D3D12_SUBRESOURCE_DATA subData;
+	subData.pData	  = positions;
+	subData.RowPitch   = bufferDesc.Width;
+	subData.SlicePitch = subData.RowPitch;
 
-	D3D12_RESOURCE_DESC resDesc = posbuffer->GetDesc();
+	//D3D12_RESOURCE_BARRIER barrier;
+	//barrier.Transition.pResource   = posbuffer.Get();
+	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	//barrier.Transition.Subresource = 0;
+	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+	//cpyListGeneral.GetList().Get()->ResourceBarrier(1, &barrier);
 
-	device->GetCopyableFootprints(
-		&resDesc, 0, 1, 0, &layouts, &NumRows, &RowSizeInBytes, &requiredSize);
+	cpyListGeneral.ScheduleCopy(posbuffer.Get(), cpyListGeneral.GetUploadHeap().Get(), subData);
 
-	BYTE* pData;
-	TIF(uploadPosBuffer->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+	copyCommandQueue.SubmitList(cpyListGeneral.GetPtr());
+	copyCommandQueue.SubmitList(cpyListVertex.GetPtr());
+	copyCommandQueue.SubmitList(cpyListGrid.GetPtr());
 
-	memcpy(pData, &positions[0], sizeof(DATA) * ARRAYSIZE(positions));
-
-	uploadPosBuffer->Unmap(0, nullptr);
-	cl->CopyBufferRegion(
-		posbuffer.Get(), 0, uploadPosBuffer.Get(), layouts.Offset, layouts.Footprint.Width);
-
-	D3D12_RESOURCE_BARRIER barrier;
-	barrier.Transition.pResource   = posbuffer.Get();
-	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-	barrier.Transition.Subresource = 0;
-	barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	cl->ResourceBarrier(1, &barrier);
-
-	cl->Close();
-	CommandQueue.SubmitList(cl.GetPtr());
-	CommandQueue.Execute();
-	CommandQueue.WaitForGPU();
+	copyCommandQueue.Execute();
+	copyCommandQueue.WaitForGPU();
+	/*
+	cpyListGeneral.Finish(posbuffer.Get()); 
+	cpyListVertex.Finish(boxBuffer.GetVertexData()); 
+	cpyListGrid.Finish(grid.GetVertexBuffer()->GetVertexData());*/
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;

@@ -1,16 +1,16 @@
 #include "CopyList.h"
 #include "pch.h"
 
-CopyList::CopyList(ID3D12Device4* pDevice, ID3D12CommandAllocator* pCommandAlloc)
+CopyList::CopyList(ID3D12Device4* pDevice)
 {
 	//Create command allocator
 	pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
 									IID_PPV_ARGS(&m_commandAllocator)); 
 	//CopyList creation.
 	TIF(pDevice->CreateCommandList(
-		0, D3D12_COMMAND_LIST_TYPE_COPY, pCommandAlloc, nullptr, IID_PPV_ARGS(&m_pCopyList)));
+		0, D3D12_COMMAND_LIST_TYPE_COPY, m_commandAllocator.Get(), nullptr, IID_PPV_ARGS(&m_pCopyList)));
 
-	m_pCopyList->Close(); 
+	//m_pCopyList->Close(); 
 
 	NAME_D3D12_OBJECT(m_pCopyList);
 }
@@ -42,6 +42,16 @@ ID3D12GraphicsCommandList* CopyList::operator->(void)
 ID3D12GraphicsCommandList* CopyList::GetPtr()
 {
 	return m_pCopyList.Get();
+}
+
+ComPtr<ID3D12GraphicsCommandList> CopyList::GetList()
+{
+	return m_pCopyList;
+}
+
+ComPtr<ID3D12Resource> CopyList::GetUploadHeap()
+{
+	return m_pUploadHeapResource;
 }
 
 HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice,
@@ -76,23 +86,14 @@ HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice,
 	return hrU;
 }
 
-void CopyList::ScheduleCopy(VertexBuffer* vertexData)
+void CopyList::ScheduleCopy(ID3D12Resource* copyDest,
+							ID3D12Resource* uploadHeapRes,
+							D3D12_SUBRESOURCE_DATA copyData)
 {
-	//Just something to hold the data for transfer to the GPU.
-	D3D12_SUBRESOURCE_DATA vbData;
-	vbData.pData	  = vertexData->GetVertexData();
-	vbData.RowPitch   = vertexData->GetVertexView().SizeInBytes;
-	vbData.SlicePitch = vbData.RowPitch;
-
-	//Schedule copy
-	UpdateSubresources<1>(
-		m_pCopyList.Get(), vertexData->GetVertexData(), m_pUploadHeapResource.Get(), 0, 0, 1, &vbData); 
-	
-	//Close CopyList
+	UpdateSubresources<1>(m_pCopyList.Get(), copyDest, uploadHeapRes, 0, 0, 1, &copyData); 
 	m_pCopyList->Close(); 
 }
-
-void CopyList::ExecuteCopy(ID3D12CommandQueue* commandQueue) 
+void CopyList::ExecuteCopy(ID3D12CommandQueue* commandQueue)
 {
 	executeList.push_back(m_pCopyList.Get()); 
 	commandQueue->ExecuteCommandLists(static_cast<UINT>(executeList.size()), executeList.data());

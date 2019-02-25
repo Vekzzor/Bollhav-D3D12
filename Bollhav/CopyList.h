@@ -1,5 +1,5 @@
 #pragma once
-#include <Core/Graphics/DX12/VertexBuffer.h>
+#include "CopyList.h"
 class CopyList
 {
 private:
@@ -9,7 +9,7 @@ private:
 	std::vector<ID3D12CommandList*> executeList;
 
 public:
-	CopyList(ID3D12Device4* device, ID3D12CommandAllocator* commandAlloc);
+	CopyList(ID3D12Device4* device);
 
 	void Prepare(ID3D12Resource* vertexBuffer);
 	void Finish(ID3D12Resource* VertexData);
@@ -17,14 +17,16 @@ public:
 	ID3D12GraphicsCommandList* operator->(void);
 	ID3D12GraphicsCommandList* GetPtr();
 
-	HRESULT
-	CreateUploadHeap(ID3D12Device4* pDevice, UINT dataSize);
+	ComPtr<ID3D12GraphicsCommandList> GetList();
+	ComPtr<ID3D12Resource> GetUploadHeap(); 
+	
+	HRESULT CreateUploadHeap(ID3D12Device4* pDevice, UINT dataSize);
 
-	void ScheduleCopy(VertexBuffer* vertexData);
+	//Non-Vertex buffer solution. 
+	void ScheduleCopy(ID3D12Resource* copyDest, ID3D12Resource* uploadHeapRes, D3D12_SUBRESOURCE_DATA copyData);
+
 	void ExecuteCopy(ID3D12CommandQueue* commandQueue);
 
 	void ResetCopyAllocator();
 	void ResetCopyList();
-
-	//void WaitForGPU();
 };

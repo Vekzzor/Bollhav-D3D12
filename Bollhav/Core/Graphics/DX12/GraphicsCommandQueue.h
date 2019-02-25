@@ -3,7 +3,7 @@
 class GraphicsCommandQueue
 {
 public:
-	GraphicsCommandQueue(ID3D12Device4* _device);
+	GraphicsCommandQueue(ID3D12Device4* _device, D3D12_COMMAND_LIST_TYPE type);
 
 	void SubmitList(ID3D12CommandList* _pCommandList);
 	void Execute();

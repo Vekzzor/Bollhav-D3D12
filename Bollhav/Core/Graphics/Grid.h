@@ -5,9 +5,11 @@
 class Grid
 {
 public:
-	Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing);
+	Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing, CopyList* copyList);
 
 	void Draw(ID3D12GraphicsCommandList* _pCmdList);
+
+	VertexBuffer* GetVertexBuffer(); 
 
 private:
 	VertexBuffer m_VertexBuffer;
