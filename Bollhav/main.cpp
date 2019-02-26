@@ -320,11 +320,11 @@ int main(int, char**)
 	UINT gridSize = grid.GetVertexSize(); 
 	UINT posSize = bufferDesc.Width;
 
-	UINT transferSize = (vertexSize + posSize); 
+	UINT transferSize = (vertexSize + gridSize + posSize); 
 
 	copyList.CreateUploadHeap(device.GetDevice(), transferSize); 
 
-	D3D12_SUBRESOURCE_DATA subResources[2]; 
+	D3D12_SUBRESOURCE_DATA subResources[3]; 
 	
 	//Vertex Transfer Data
 	subResources[0].pData		 = vbDesc.pData; 
@@ -332,14 +332,14 @@ int main(int, char**)
 	subResources[0].SlicePitch  = subResources[0].RowPitch; 
 
 	//Grid Transfer Data
-	//subResources[1].pData = grid.GetVertexBuffer()->GetBufferData().pData;  
-	//subResources[1].RowPitch = grid.GetVertexBuffer()->GetBufferData().RowPitch; 
-	//subResources[1].SlicePitch = subResources[1].RowPitch; 
+	subResources[1].pData = grid.GetDataVector().data();  
+	subResources[1].RowPitch = grid.GetVertexBuffer()->GetBufferData().RowPitch; 
+	subResources[1].SlicePitch = subResources[1].RowPitch; 
 	
 	//Position Transfer Data
-	subResources[1].pData = positions;
-	subResources[1].RowPitch = bufferDesc.Width;
-	subResources[1].SlicePitch = subResources[2].RowPitch;
+	subResources[2].pData = positions;
+	subResources[2].RowPitch = bufferDesc.Width;
+	subResources[2].SlicePitch = subResources[2].RowPitch;
 
 	//Schedule the Vertex transfer
 	copyList.ScheduleCopy(
@@ -355,11 +355,11 @@ int main(int, char**)
 	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
 
 	//Schedule the Grid transfer.
-	//
-	//copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
-	//					  copyList.GetUploadHeap().Get(),
-	//					  subResources[1],
-	//					  0); 
+	
+	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
+						  copyList.GetUploadHeap().Get(),
+						  subResources[1],
+						  vertexSize); 
 
 	//barrier.Transition.pResource   = grid.GetVertexBuffer()->GetBufferResource();
 	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
@@ -370,7 +370,7 @@ int main(int, char**)
 	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
 
 	//Schedule the Position transfer. 
-	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[1], 0); 
+	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize)); 
 
 	//barrier.Transition.pResource   = posbuffer.Get();
 	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;

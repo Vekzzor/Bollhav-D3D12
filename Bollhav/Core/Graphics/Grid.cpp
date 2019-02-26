@@ -30,7 +30,9 @@ Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Widt
 	m_VertexBuffer.Create(_pDevice, &vbd);
 
 	//For use for upload heap creation later. 
-	m_vertexSize = vbd.SizeInBytes; 
+	m_vertexSize = vbd.SizeInBytes;
+	m_vertexData = vbd.pData; 
+	m_dataVector = vertices; 
 
 	// Create the pipelinestate
 	m_Pipeline.SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
@@ -58,4 +60,14 @@ VertexBuffer* Grid::GetVertexBuffer()
 const UINT Grid::GetVertexSize() const
 {
 	return m_vertexSize; 
+}
+
+const LPVOID Grid::GetVertexData() const
+{
+	return m_vertexData;
+}
+
+const std::vector<XMFLOAT3>& Grid::GetDataVector() const
+{
+	return m_dataVector; 
 }
