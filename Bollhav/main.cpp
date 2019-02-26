@@ -345,47 +345,42 @@ int main(int, char**)
 	copyList.ScheduleCopy(
 		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0); 
 
-	//D3D12_RESOURCE_BARRIER barrier;
-	//barrier.Transition.pResource   = boxBuffer.GetBufferResource();
-	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-	//barrier.Transition.Subresource = 0;
-	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
-	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
-
-	//Schedule the Grid transfer.
-	
+	//Schedule the Grid transfer.	
 	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
 						  copyList.GetUploadHeap().Get(),
 						  subResources[1],
 						  vertexSize); 
 
-	//barrier.Transition.pResource   = grid.GetVertexBuffer()->GetBufferResource();
-	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-	//barrier.Transition.Subresource = 0;
-	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
-	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
-
 	//Schedule the Position transfer. 
 	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize)); 
 
-	//barrier.Transition.pResource   = posbuffer.Get();
-	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-	//barrier.Transition.Subresource = 0;
-	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
-	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
-
-	
+	ID3D12Resource* vResources[2];
+	vResources[0] = boxBuffer.GetBufferResource(); 
+	vResources[1] = grid.GetVertexBuffer()->GetBufferResource(); 
 
 	//Submit and execute
 	copyCommandQueue.SubmitList(copyList.GetList().Get()); 
+	
+	//D3D12_RESOURCE_BARRIER vertexBarrier;
+	//vertexBarrier.Transition.pResource   = *vResources;
+	//vertexBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	//vertexBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+	//vertexBarrier.Transition.Subresource = 0;
+	//vertexBarrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	//vertexBarrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+	//copyList.GetList().Get()->ResourceBarrier(2, &vertexBarrier);
 
-	TIF(copyList.GetList().Get()->Close()); 
+	//D3D12_RESOURCE_BARRIER posBarrier;
+	//posBarrier.Transition.pResource   = posbuffer.Get();
+	//posBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	//posBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	//posBarrier.Transition.Subresource = 0;
+	//posBarrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	//posBarrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+	//copyList.GetList().Get()->ResourceBarrier(1, &posBarrier);
+
+	copyList.GetList().Get()->Close(); 
+
 
 	copyCommandQueue.Execute();
 	copyCommandQueue.WaitForGPU();
