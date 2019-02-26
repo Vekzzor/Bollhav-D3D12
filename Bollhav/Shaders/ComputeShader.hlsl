@@ -39,17 +39,17 @@ void CS_main(uint3 DTid : SV_DispatchThreadID)
     float mass = g_fParticleMass;
     
    
-    for (uint i = 0; i < 3; i++)
+    for (uint i = 0; i < 1024; i++)
     {
         bodyBodyInteraction(accel, srv[i].pos, pos, mass, 1);
  
     }
-    vel.xyz += accel.xyz * 0.1f; //deltaTime;
+    vel.xyz += accel.xyz * 0.0001f; //deltaTime;
     vel.xyz *= 1; //damping;
-    pos.xyz += vel.xyz * 0.1f; //deltaTime;
-
+    pos.xyz += vel.xyz * 0.0001f; //deltaTime;
+   // pos.xyz += (accel.xyz * 0.001f) / 2.0f;
   
-    outputData[index].pos = current.pos;
-    outputData[index].vel = current.vel;
+    outputData[index].pos = pos;
+    outputData[index].vel = vel;
     
 }
