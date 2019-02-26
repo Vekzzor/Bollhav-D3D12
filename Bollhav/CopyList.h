@@ -23,7 +23,7 @@ public:
 	HRESULT CreateUploadHeap(ID3D12Device4* pDevice, UINT dataSize);
 
 	//Non-Vertex buffer solution. 
-	void ScheduleCopy(ID3D12Resource* copyDest, ID3D12Resource* uploadHeapRes, D3D12_SUBRESOURCE_DATA copyData);
+	void ScheduleCopy(ID3D12Resource* copyDest, ID3D12Resource* uploadHeapRes, D3D12_SUBRESOURCE_DATA copyData, UINT offset);
 
 	void ExecuteCopy(ID3D12CommandQueue* commandQueue);
 

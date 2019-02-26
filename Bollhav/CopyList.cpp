@@ -88,10 +88,10 @@ HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice,
 
 void CopyList::ScheduleCopy(ID3D12Resource* copyDest,
 							ID3D12Resource* uploadHeapRes,
-							D3D12_SUBRESOURCE_DATA copyData)
+							D3D12_SUBRESOURCE_DATA copyData, 
+							UINT offset)
 {
-	UpdateSubresources<1>(m_pCopyList.Get(), copyDest, uploadHeapRes, 0, 0, 1, &copyData); 
-	m_pCopyList->Close(); 
+	UpdateSubresources<1>(m_pCopyList.Get(), copyDest, uploadHeapRes,offset,0, 1, &copyData);  
 }
 void CopyList::ExecuteCopy(ID3D12CommandQueue* commandQueue)
 {

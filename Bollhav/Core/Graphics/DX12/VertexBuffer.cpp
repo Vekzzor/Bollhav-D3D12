@@ -1,11 +1,11 @@
 #include "VertexBuffer.h"
 
-VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* cpyList)
+VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 {
-	Create(_pDevice, _pDesc, cpyList);
+	Create(_pDevice, _pDesc);
 }
 
-void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, CopyList* copyList)
+void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 {
 	D3D12_HEAP_PROPERTIES heapProp;
 	heapProp.Type				  = D3D12_HEAP_TYPE_DEFAULT;
@@ -35,25 +35,11 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, C
 										  IID_PPV_ARGS(&m_pVertexData)));
 
 	//Just something to hold the data for transfer to the GPU.
-	D3D12_SUBRESOURCE_DATA vbData;
-	vbData.pData	  = m_pVertexData.Get();
-	vbData.RowPitch   = sizeof(m_pVertexData);
-	vbData.SlicePitch = vbData.RowPitch;
+	m_vbData.pData	  = m_pVertexData.Get();
+	m_vbData.RowPitch   = sizeof(m_pVertexData);
+	m_vbData.SlicePitch = m_vbData.RowPitch;
 
-	//Create Upload Heap for copy. 
-	copyList->CreateUploadHeap(_pDevice, vbData.RowPitch); 
-
-	//Schedule copy
-	UpdateSubresources<1>(copyList->GetList().Get(), 
-		m_pVertexData.Get(),
-		copyList->GetUploadHeap().Get(),
-						  0,
-						  0,
-						  1,
-						  &vbData);
-	
-	copyList->GetList().Get()->Close();  
-
+  
 	//Init view
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
 	m_BufferView.SizeInBytes	= desc.Width;
@@ -72,7 +58,12 @@ UINT VertexBuffer::GetVertexCount() const
 	return m_VertexCount;
 }
 
-ID3D12Resource* VertexBuffer::GetVertexData() const
+ID3D12Resource* VertexBuffer::GetBufferResource()
 {
 	return m_pVertexData.Get();
+}
+
+const D3D12_SUBRESOURCE_DATA& VertexBuffer::GetBufferData() const
+{
+	return m_vbData; 
 }

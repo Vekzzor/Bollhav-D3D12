@@ -107,9 +107,7 @@ int main(int, char**)
 	FrameManager fm(device.GetDevice());
 	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
 
-	CopyList cpyListVertex  = CopyList(device.GetDevice());
-	CopyList cpyListGrid	= CopyList(device.GetDevice());
-	CopyList cpyListGeneral = CopyList(device.GetDevice());
+	CopyList copyList = CopyList(device.GetDevice()); 
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
@@ -129,7 +127,7 @@ int main(int, char**)
 	vbDesc.pData		 = v.data();
 	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
 	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
-	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc, &cpyListVertex);
+	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc);
 
 	GraphicsPipelineState gps;
 	auto desc	 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -140,7 +138,7 @@ int main(int, char**)
 	gps.Finalize(device.GetDevice(), pRootGraphics.Get());
 
 	// Generate grid
-	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1, &cpyListGrid);
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1);
 
 	FPSCamera camera;
 	camera.setPosition({0, 5, 0});
@@ -286,24 +284,7 @@ int main(int, char**)
 	positions[3].z  = -5;
 	positions[3].vx = positions[3].vy = positions[3].vz = 1.0f;
 
-	//D3D12_HEAP_PROPERTIES uploadHeap = {};
-	//uploadHeap.CPUPageProperty		 = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	//uploadHeap.CreationNodeMask		 = 1;
-	//uploadHeap.MemoryPoolPreference  = D3D12_MEMORY_POOL_UNKNOWN;
-	//uploadHeap.Type					 = D3D12_HEAP_TYPE_UPLOAD;
-	//uploadHeap.VisibleNodeMask		 = 1;
 
-	//D3D12_RESOURCE_DESC uploadBufferDesc = {};
-	//uploadBufferDesc.Alignment			 = 0;
-	//uploadBufferDesc.DepthOrArraySize	= 1;
-	//uploadBufferDesc.Dimension			 = D3D12_RESOURCE_DIMENSION_BUFFER;
-	//uploadBufferDesc.Flags				 = D3D12_RESOURCE_FLAG_NONE;
-	//uploadBufferDesc.Format				 = DXGI_FORMAT_UNKNOWN;
-	//uploadBufferDesc.Height				 = 1;
-	//uploadBufferDesc.Width				 = sizeof(positions);
-	//uploadBufferDesc.Layout				 = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	//uploadBufferDesc.MipLevels			 = 1;
-	//uploadBufferDesc.SampleDesc.Count	= 1;
 
 	D3D12_HEAP_PROPERTIES defaultHeap = {};
 	defaultHeap.CPUPageProperty		  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -332,35 +313,83 @@ int main(int, char**)
 										nullptr,
 										IID_PPV_ARGS(&posbuffer)));
 	NAME_D3D12_OBJECT(posbuffer);
+	
+	//Create Upload Heap for all the transfers
 
-	cpyListGeneral.CreateUploadHeap(device.GetDevice(), sizeof(positions));
+	UINT vertexSize = vbDesc.SizeInBytes;  
+	UINT gridSize = grid.GetVertexSize(); 
+	UINT posSize = bufferDesc.Width;
 
-	D3D12_SUBRESOURCE_DATA subData;
-	subData.pData	  = positions;
-	subData.RowPitch   = bufferDesc.Width;
-	subData.SlicePitch = subData.RowPitch;
+	UINT transferSize = (vertexSize + posSize); 
+
+	copyList.CreateUploadHeap(device.GetDevice(), transferSize); 
+
+	D3D12_SUBRESOURCE_DATA subResources[2]; 
+	
+	//Vertex Transfer Data
+	subResources[0].pData		 = vbDesc.pData; 
+	subResources[0].RowPitch	= vbDesc.SizeInBytes; 
+	subResources[0].SlicePitch  = subResources[0].RowPitch; 
+
+	//Grid Transfer Data
+	//subResources[1].pData = grid.GetVertexBuffer()->GetBufferData().pData;  
+	//subResources[1].RowPitch = grid.GetVertexBuffer()->GetBufferData().RowPitch; 
+	//subResources[1].SlicePitch = subResources[1].RowPitch; 
+	
+	//Position Transfer Data
+	subResources[1].pData = positions;
+	subResources[1].RowPitch = bufferDesc.Width;
+	subResources[1].SlicePitch = subResources[2].RowPitch;
+
+	//Schedule the Vertex transfer
+	copyList.ScheduleCopy(
+		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0); 
 
 	//D3D12_RESOURCE_BARRIER barrier;
+	//barrier.Transition.pResource   = boxBuffer.GetBufferResource();
+	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+	//barrier.Transition.Subresource = 0;
+	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
+
+	//Schedule the Grid transfer.
+	//
+	//copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
+	//					  copyList.GetUploadHeap().Get(),
+	//					  subResources[1],
+	//					  0); 
+
+	//barrier.Transition.pResource   = grid.GetVertexBuffer()->GetBufferResource();
+	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+	//barrier.Transition.Subresource = 0;
+	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
+
+	//Schedule the Position transfer. 
+	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[1], 0); 
+
 	//barrier.Transition.pResource   = posbuffer.Get();
 	//barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 	//barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 	//barrier.Transition.Subresource = 0;
 	//barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	//barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
-	//cpyListGeneral.GetList().Get()->ResourceBarrier(1, &barrier);
+	//copyList.GetList().Get()->ResourceBarrier(1, &barrier);
 
-	cpyListGeneral.ScheduleCopy(posbuffer.Get(), cpyListGeneral.GetUploadHeap().Get(), subData);
+	
 
-	copyCommandQueue.SubmitList(cpyListGeneral.GetPtr());
-	copyCommandQueue.SubmitList(cpyListVertex.GetPtr());
-	copyCommandQueue.SubmitList(cpyListGrid.GetPtr());
+	//Submit and execute
+	copyCommandQueue.SubmitList(copyList.GetList().Get()); 
+
+	TIF(copyList.GetList().Get()->Close()); 
 
 	copyCommandQueue.Execute();
 	copyCommandQueue.WaitForGPU();
-	/*
-	cpyListGeneral.Finish(posbuffer.Get()); 
-	cpyListVertex.Finish(boxBuffer.GetVertexData()); 
-	cpyListGrid.Finish(grid.GetVertexBuffer()->GetVertexData());*/
+	
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
