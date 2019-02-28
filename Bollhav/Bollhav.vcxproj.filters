@@ -29,6 +29,7 @@
     <ClCompile Include="Core\Graphics\Grid.cpp" />
     <ClCompile Include="Core\Graphics\DX12\DepthStencil.cpp" />
     <ClCompile Include="Core\Compute\ComputeQueue.cpp" />
+    <ClCompile Include="DX12Heap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Compute\GPUComputing.h" />
@@ -49,9 +50,7 @@
     <ClInclude Include="Utility\imstb_truetype.h" />
     <ClInclude Include="Utility\d3dx12.h" />
     <ClInclude Include="Core\Camera\FPSCamera.h" />
-
     <ClInclude Include="CopyList.h" />
-
     <ClInclude Include="Utility\ObjLoader.h" />
     <ClInclude Include="Core\Graphics\DX12\CommandList.h" />
     <ClInclude Include="Core\Graphics\DX12\ConstantBuffer.h" />
@@ -63,7 +62,8 @@
     <ClInclude Include="Core\Graphics\Grid.h" />
     <ClInclude Include="Core\Graphics\DX12\DepthStencil.h" />
     <ClInclude Include="Core\Compute\ComputeQueue.h" />
-
+    <ClInclude Include="HelperFunctions.h" />
+    <ClInclude Include="DX12Heap.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\LineVS.hlsl" />

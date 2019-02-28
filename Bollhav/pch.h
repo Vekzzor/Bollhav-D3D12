@@ -33,10 +33,16 @@ using namespace Microsoft::WRL;
 #include <string>
 #include <vector>
 
+//Helper
+#include "HelperFunctions.h"
+
 // ImGui
 #include <Utility/imgui.h>
 #include <Utility/imgui_impl_dx12.h>
 #include <Utility/imgui_impl_win32.h>
+
+//User Defined
+#include "Core/Graphics/DX12/DX12Heap.h"
 
 inline void TIF(HRESULT hr)
 {
