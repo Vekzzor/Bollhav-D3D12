@@ -351,14 +351,19 @@ int main(int, char**)
 	//Schedule the Position transfer. 
 	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize)); 
 
-	ID3D12Resource* vResources[2];
-	vResources[0] = boxBuffer.GetBufferResource(); 
-	vResources[1] = grid.GetVertexBuffer()->GetBufferResource(); 
 
 	//Submit and execute
 	copyCommandQueue.SubmitList(copyList.GetList().Get()); 
 	
 	copyList.GetList().Get()->Close(); 
+
+	copyCommandQueue.Execute();
+	copyCommandQueue.WaitForGPU();
+	
+	ID3D12Resource* vResources[2];
+	vResources[0] = boxBuffer.GetBufferResource(); 
+	vResources[1] = grid.GetVertexBuffer()->GetBufferResource(); 
+
 	/*D3D12_RESOURCE_BARRIER vertexBarrier;
 	vertexBarrier.Transition.pResource   = *vResources;
 	vertexBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
@@ -377,10 +382,6 @@ int main(int, char**)
 	posBarrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
 	copyList.GetList().Get()->ResourceBarrier(1, &posBarrier);*/
 
-
-	copyCommandQueue.Execute();
-	copyCommandQueue.WaitForGPU();
-	
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
