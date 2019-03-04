@@ -1,6 +1,9 @@
 #include "DX12Heap.h"
 
-DX12Heap::DX12Heap() {}
+DX12Heap::DX12Heap() 
+{
+	
+}
 
 DX12Heap::~DX12Heap() {}
 

@@ -344,9 +344,34 @@ int main(int, char**)
 	subResources[2].RowPitch   = bufferDesc.Width;
 	subResources[2].SlicePitch = subResources[2].RowPitch;
 
+	//Make sure to create the resources on the GPU
+
+	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
+
+	dynamicHeap.SetDesc(size, heapProperties, 0, D3D12_HEAP_FLAG_NONE);
+	dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
+	
+	dynamicHeap.InsertResource(device.GetDevice(),
+							   0,
+							   boxBuffer.GetBufferResource()->GetDesc(),
+							   D3D12_RESOURCE_STATE_COPY_DEST,
+							   boxBuffer.GetBufferResource());
+
+	dynamicHeap.InsertResource(device.GetDevice(),
+							   subResources[0].RowPitch,
+							   grid.GetVertexBuffer()->GetBufferResource()->GetDesc(),
+							   D3D12_RESOURCE_STATE_COPY_DEST,
+							   grid.GetVertexBuffer()->GetBufferResource());
+
+	dynamicHeap.InsertResource(device.GetDevice(),
+							   (subResources[0].RowPitch + subResources[1].RowPitch),
+							   posbuffer.Get()->GetDesc(),
+							   D3D12_RESOURCE_STATE_COPY_DEST,
+							   posbuffer.Get());
+
 	//Schedule the Vertex transfer
 	copyList.ScheduleCopy(
-		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0);
+		boxBuffer.GetBufferResource(),copyList.GetUploadHeap().Get(), subResources[0], 0);
 
 	//Schedule the Grid transfer.
 	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
@@ -469,82 +494,82 @@ int main(int, char**)
 			if(GetAsyncKeyState('E'))
 				camMovement += camRotMat.r[1] * deltaTime * speed;
 
-			if(GetAsyncKeyState('C'))
-			{
-				//Resize the position buffer and its SRV and copy the
-				//new information to them.
-				nCubes++;
+			//if(GetAsyncKeyState('C'))
+			//{
+			//	//Resize the position buffer and its SRV and copy the
+			//	//new information to them.
+			//	nCubes++;
 
-				UINT offset = sizeof(positions);
+			//	UINT offset = sizeof(positions);
 
-				Resize::ResizeArray(positions, nCubes - 1, nCubes);
+			//	Resize::ResizeArray(positions, nCubes - 1, nCubes);
 
-				float rand_y = rand() / RAND_MAX;
-				float rand_x = rand() / RAND_MAX;
+			//	float rand_y = rand() / RAND_MAX;
+			//	float rand_x = rand() / RAND_MAX;
 
-				float ii			= static_cast<float>(nCubes);
-				positions[nCubes].x = (rand() % 10) - 5;
+			//	float ii			= static_cast<float>(nCubes);
+			//	positions[nCubes].x = (rand() % 10) - 5;
 
-				positions[nCubes].y = (rand() % 10) - 5;
-				positions[nCubes].z = (rand() % 10) - 5;
+			//	positions[nCubes].y = (rand() % 10) - 5;
+			//	positions[nCubes].z = (rand() % 10) - 5;
 
-				positions[nCubes].vx = rand_y * 0.001f;
-				positions[nCubes].vy = -rand_x * 0.001f;
-				positions[nCubes].vz = 0.0f;
+			//	positions[nCubes].vx = rand_y * 0.001f;
+			//	positions[nCubes].vy = -rand_x * 0.001f;
+			//	positions[nCubes].vz = 0.0f;
 
-				//Create a new upload heap with enough space
-				UINT size = sizeof(positions);
-				copyList.CreateUploadHeap(device.GetDevice(), size);
+			//	//Create a new upload heap with enough space
+			//	UINT size = sizeof(positions);
+			//	copyList.CreateUploadHeap(device.GetDevice(), size);
 
-				D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
+			//	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
-				//Create a heap with the new position data
-				dynamicHeap.SetDesc(size, heapProperties, 0, D3D12_HEAP_FLAG_NONE);
-				dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
+			//	//Create a heap with the new position data
+			//	dynamicHeap.SetDesc(size, heapProperties, 0, D3D12_HEAP_FLAG_NONE);
+			//	dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
 
-				bufferDesc.Alignment		= 0;
-				bufferDesc.DepthOrArraySize = 1;
-				bufferDesc.Dimension		= D3D12_RESOURCE_DIMENSION_BUFFER;
-				bufferDesc.Flags			= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-				bufferDesc.Format			= DXGI_FORMAT_UNKNOWN;
-				bufferDesc.Height			= 1;
-				bufferDesc.Width			= size;
-				bufferDesc.Layout			= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-				bufferDesc.MipLevels		= 1;
-				bufferDesc.SampleDesc.Count = 1;
+			//	bufferDesc.Alignment		= 0;
+			//	bufferDesc.DepthOrArraySize = 1;
+			//	bufferDesc.Dimension		= D3D12_RESOURCE_DIMENSION_BUFFER;
+			//	bufferDesc.Flags			= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+			//	bufferDesc.Format			= DXGI_FORMAT_UNKNOWN;
+			//	bufferDesc.Height			= 1;
+			//	bufferDesc.Width			= size;
+			//	bufferDesc.Layout			= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+			//	bufferDesc.MipLevels		= 1;
+			//	bufferDesc.SampleDesc.Count = 1;
 
-				//Set the resource (in this case the resorce with positions)
-				dynamicHeap.InsertResource(device.GetDevice(),
-										   offset,
-										   bufferDesc,
-										   D3D12_RESOURCE_STATE_COPY_DEST,
-										   posbuffer.Get());
+			//	//Set the resource (in this case the resorce with positions)
+			//	dynamicHeap.InsertResource(device.GetDevice(),
+			//							   offset,
+			//							   bufferDesc,
+			//							   D3D12_RESOURCE_STATE_COPY_DEST,
+			//							   posbuffer.Get());
 
-				/*			srvDesc.Buffer.FirstElement				= 0;
-				srvDesc.Buffer.NumElements				= nCubes;
-				srvDesc.Buffer.StructureByteStride		= sizeof(DATA);
-				srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
-				srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
-				srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
+			//				srvDesc.Buffer.FirstElement				= 0;
+			//	srvDesc.Buffer.NumElements				= nCubes;
+			//	srvDesc.Buffer.StructureByteStride		= sizeof(DATA);
+			//	srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
+			//	srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			//	srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
+			//	srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
-				device->CreateShaderResourceView(
-					posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
+			//	device->CreateShaderResourceView(
+			//		posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
 
-				uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
-				uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
-				uavDesc.Buffer.FirstElement				 = 0;
-				uavDesc.Buffer.NumElements				 = nCubes;
-				uavDesc.Buffer.StructureByteStride		 = sizeof(DATA);
-				uavDesc.Buffer.CounterOffsetInBytes		 = 0;
-				uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
+			//	uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
+			//	uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
+			//	uavDesc.Buffer.FirstElement				 = 0;
+			//	uavDesc.Buffer.NumElements				 = nCubes;
+			//	uavDesc.Buffer.StructureByteStride		 = sizeof(DATA);
+			//	uavDesc.Buffer.CounterOffsetInBytes		 = 0;
+			//	uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
 
-				auto offHeap  = g_Heap->GetCPUDescriptorHandleForHeapStart();
-				UINT descSize = device->GetDescriptorHandleIncrementSize(
-					D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				offHeap.ptr += descSize;
-				device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);*/
-			}
+			//	auto offHeap  = g_Heap->GetCPUDescriptorHandleForHeapStart();
+			//	UINT descSize = device->GetDescriptorHandleIncrementSize(
+			//		D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			//	offHeap.ptr += descSize;
+			//	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
+			//}
 
 			camera.move(camMovement);
 			camera.update(deltaTime);
