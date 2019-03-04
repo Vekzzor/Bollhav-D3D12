@@ -12,6 +12,7 @@
 #include <Core/Graphics/FrameManager.h>
 #include <Core/Graphics/Grid.h>
 #include <Core/Window/Window.h>
+#include <DX12Heap.h>
 
 #include <Utility/ObjLoader.h>
 
@@ -474,7 +475,7 @@ int main(int, char**)
 				//new information to them.
 				nCubes++;
 
-				UINT offset = sizeof(positions); 
+				UINT offset = sizeof(positions);
 
 				Resize::ResizeArray(positions, nCubes - 1, nCubes);
 
@@ -491,10 +492,6 @@ int main(int, char**)
 				positions[nCubes].vy = -rand_x * 0.001f;
 				positions[nCubes].vz = 0.0f;
 
-
-				//Create new Resource and Resource Desc. 
-
-
 				//Create a new upload heap with enough space
 				UINT size = sizeof(positions);
 				copyList.CreateUploadHeap(device.GetDevice(), size);
@@ -503,10 +500,50 @@ int main(int, char**)
 
 				//Create a heap with the new position data
 				dynamicHeap.SetDesc(size, heapProperties, 0, D3D12_HEAP_FLAG_NONE);
-				dynamicHeap.CreateWithCurrentSettings(device.GetDevice()); 
+				dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
+
+				bufferDesc.Alignment		= 0;
+				bufferDesc.DepthOrArraySize = 1;
+				bufferDesc.Dimension		= D3D12_RESOURCE_DIMENSION_BUFFER;
+				bufferDesc.Flags			= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+				bufferDesc.Format			= DXGI_FORMAT_UNKNOWN;
+				bufferDesc.Height			= 1;
+				bufferDesc.Width			= size;
+				bufferDesc.Layout			= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+				bufferDesc.MipLevels		= 1;
+				bufferDesc.SampleDesc.Count = 1;
 
 				//Set the resource (in this case the resorce with positions)
-				//dynamicHeap.InsertResource(device.GetDevice(),offset, )
+				dynamicHeap.InsertResource(device.GetDevice(),
+										   offset,
+										   bufferDesc,
+										   D3D12_RESOURCE_STATE_COPY_DEST,
+										   posbuffer.Get());
+
+				/*			srvDesc.Buffer.FirstElement				= 0;
+				srvDesc.Buffer.NumElements				= nCubes;
+				srvDesc.Buffer.StructureByteStride		= sizeof(DATA);
+				srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
+				srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
+				srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
+
+				device->CreateShaderResourceView(
+					posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
+
+				uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
+				uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
+				uavDesc.Buffer.FirstElement				 = 0;
+				uavDesc.Buffer.NumElements				 = nCubes;
+				uavDesc.Buffer.StructureByteStride		 = sizeof(DATA);
+				uavDesc.Buffer.CounterOffsetInBytes		 = 0;
+				uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
+
+				auto offHeap  = g_Heap->GetCPUDescriptorHandleForHeapStart();
+				UINT descSize = device->GetDescriptorHandleIncrementSize(
+					D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				offHeap.ptr += descSize;
+				device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);*/
 			}
 
 			camera.move(camMovement);

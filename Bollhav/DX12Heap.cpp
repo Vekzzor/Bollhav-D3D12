@@ -1,5 +1,4 @@
 #include "DX12Heap.h"
-#include "pch.h"
 
 DX12Heap::DX12Heap() {}
 
@@ -8,7 +7,7 @@ DX12Heap::~DX12Heap() {}
 void DX12Heap::CreateWithCurrentSettings(ID3D12Device4* device)
 {
 	if(m_descriptionSet)
-		TIF(device->CreateHeap(m_heapDesc, IID_PPV_ARGS(m_heap)));
+		TIF(device->CreateHeap(&m_heapDesc, IID_PPV_ARGS(&m_heap)));
 	else
 	{
 		std::cout << "FAILED TO CREATE HEAP: DESCRIPTION NOT SET" << std::endl;
@@ -16,22 +15,24 @@ void DX12Heap::CreateWithCurrentSettings(ID3D12Device4* device)
 	}
 }
 
-void DX12Heap::InsertResource(ID3D12Device4* device, UINT offset, D3D12_RESOURCE_DESC resDesc,
-	D3D12_RESOURCE_STATES resState, D3D12_CLEAR_VALUE clearValue, ID3D12Resource* res)
+void DX12Heap::InsertResource(ID3D12Device4* device,
+							  UINT offset,
+							  D3D12_RESOURCE_DESC resDesc,
+							  D3D12_RESOURCE_STATES resState,
+							  ID3D12Resource* res)
 {
-	if (m_heapCreated)
+	if(m_heapCreated)
 	{
-		device->CreatePlacedResource(
-			m_heap.Get(), offset, resDesc, resState, clearValue, IID_PPV_ARGS(res));
+		device->CreatePlacedResource(m_heap.Get(), offset, &resDesc, resState,0,IID_PPV_ARGS(&res));
 	}
 	else
 	{
-		std::cout << "RESOURCE COULD NOT BE INSERTED: NO HEAP IS CREATED." << std::endl; 
-		exit(0); 
+		std::cout << "RESOURCE COULD NOT BE INSERTED: NO HEAP IS CREATED." << std::endl;
+		exit(0);
 	}
 }
 
-DX12Heap* DX12Heap::Get()
+ID3D12Heap* DX12Heap::Get()
 {
 	return m_heap.Get();
 }

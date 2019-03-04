@@ -41,9 +41,6 @@ using namespace Microsoft::WRL;
 #include <Utility/imgui_impl_dx12.h>
 #include <Utility/imgui_impl_win32.h>
 
-//User Defined
-#include "Core/Graphics/DX12/DX12Heap.h"
-
 inline void TIF(HRESULT hr)
 {
 #if _DEBUG
