@@ -1,16 +1,19 @@
 #include "DX12Heap.h"
 
 DX12Heap::DX12Heap() 
-{
-	
+{ 
+
 }
 
 DX12Heap::~DX12Heap() {}
 
 void DX12Heap::CreateWithCurrentSettings(ID3D12Device4* device)
 {
-	if(m_descriptionSet)
-		TIF(device->CreateHeap(&m_heapDesc, IID_PPV_ARGS(&m_heap)));
+	if (m_descriptionSet)
+	{
+		device->CreateHeap(&m_heapDesc,IID_PPV_ARGS(m_heap.GetAddressOf()));
+		m_heapCreated = true; 
+	}
 	else
 	{
 		std::cout << "FAILED TO CREATE HEAP: DESCRIPTION NOT SET" << std::endl;
@@ -37,7 +40,7 @@ void DX12Heap::InsertResource(ID3D12Device4* device,
 
 ID3D12Heap* DX12Heap::Get()
 {
-	return m_heap.Get();
+	return m_heap.Get(); 
 }
 
 void DX12Heap::SetDesc(UINT64 SizeInBytes,
@@ -60,6 +63,7 @@ void DX12Heap::SetDesc(UINT64 SizeInBytes,
 		exit(0);
 	}
 }
+
 
 void DX12Heap::SetProperties(D3D12_HEAP_TYPE Type,
 							 D3D12_CPU_PAGE_PROPERTY CPUPageProperty,

@@ -29,6 +29,16 @@ ComPtr<ID3D12DescriptorHeap> g_Heap;
 
 int main(int, char**)
 {
+	ID3D12Debug* debugController; 
+
+	HMODULE mD3D12 = GetModuleHandle("D3D12.dll");
+	PFN_D3D12_GET_DEBUG_INTERFACE f =
+		(PFN_D3D12_GET_DEBUG_INTERFACE)GetProcAddress(mD3D12, "D3D12GetDebugInterface");
+	if(SUCCEEDED(f(IID_PPV_ARGS(&debugController))))
+	{
+		debugController->EnableDebugLayer();
+	}
+
 	Window window(VideoMode(1280, 720), L"Hejsan");
 
 	Device device;
@@ -314,7 +324,7 @@ int main(int, char**)
 										&bufferDesc,
 										D3D12_RESOURCE_STATE_COPY_DEST,
 										nullptr,
-										IID_PPV_ARGS(&posbuffer)));
+										IID_PPV_ARGS(posbuffer.GetAddressOf())));
 	NAME_D3D12_OBJECT(posbuffer);
 
 	//Create Upload Heap for all the transfers
@@ -348,7 +358,8 @@ int main(int, char**)
 
 	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
-	dynamicHeap.SetDesc(size, heapProperties, 0, D3D12_HEAP_FLAG_NONE);
+	//Do not set any heap flags because of Heap Tier Support issue. 
+	dynamicHeap.SetDesc(UINT64(transferSize), heapProperties, 0, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS);
 	dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
 	
 	dynamicHeap.InsertResource(device.GetDevice(),
@@ -358,13 +369,13 @@ int main(int, char**)
 							   boxBuffer.GetBufferResource());
 
 	dynamicHeap.InsertResource(device.GetDevice(),
-							   subResources[0].RowPitch,
+							   0,
 							   grid.GetVertexBuffer()->GetBufferResource()->GetDesc(),
 							   D3D12_RESOURCE_STATE_COPY_DEST,
 							   grid.GetVertexBuffer()->GetBufferResource());
 
 	dynamicHeap.InsertResource(device.GetDevice(),
-							   (subResources[0].RowPitch + subResources[1].RowPitch),
+							   0,
 							   posbuffer.Get()->GetDesc(),
 							   D3D12_RESOURCE_STATE_COPY_DEST,
 							   posbuffer.Get());
