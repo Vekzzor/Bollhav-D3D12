@@ -26,11 +26,36 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList);
 
 ComPtr<ID3D12DescriptorHeap> g_Heap;
 
+ComPtr<ID3D12RootSignature> gRootCompute;
+ComPtr<ID3D12PipelineState> gComputePipeline;
+
+// Buffer containing positions
+ComPtr<ID3D12Resource> gPosbuffer;
+
+// Thread 
+constexpr UINT gThreadCount = 1;
+
+HANDLE gThreadHandles[gThreadCount];
+UINT gThreadIndexes[gThreadCount];
+
+void CreateThreads(ID3D12Device* _pDevice);
+DWORD WINAPI ThreadProc(LPVOID _pThreadData);
+
+// Per Thread
+ComPtr<ID3D12CommandQueue> gTComputeQueue[gThreadCount];
+ComPtr<ID3D12CommandAllocator> gTComputeAllocator[gThreadCount];
+ComPtr<ID3D12GraphicsCommandList> gTComputeList[gThreadCount];
+ComPtr<ID3D12Fence> gTFence[gThreadCount];
+HANDLE gTEvent[gThreadCount];
+
+
 int main(int, char**)
 {
 	Window window(VideoMode(1280, 720), L"Hejsan");
 
 	Device device;
+
+	CreateThreads(device.GetDevice());
 	Swapchain sc(device.GetDevice());
 	GraphicsCommandQueue CommandQueue(device.GetDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -105,9 +130,9 @@ int main(int, char**)
 	}
 
 	FrameManager fm(device.GetDevice());
-	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetCommandAllocator());
+	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetDirectAllocator());
 
-	CopyList copyList = CopyList(device.GetDevice()); 
+	CopyList copyList = CopyList(device.GetDevice());
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
@@ -138,7 +163,7 @@ int main(int, char**)
 	gps.Finalize(device.GetDevice(), pRootGraphics.Get());
 
 	// Generate grid
-	Grid grid(device.GetDevice(), pRootGraphics.Get(), 10, 1);
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), 100, 1);
 
 	FPSCamera camera;
 	camera.setPosition({0, 5, 0});
@@ -157,7 +182,7 @@ int main(int, char**)
 	scissor.top	= 0;
 	scissor.bottom = vp.Height;
 
-	ComPtr<ID3D12RootSignature> pRootCompute;
+	
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -213,9 +238,9 @@ int main(int, char**)
 		TIF(device->CreateRootSignature(0,
 										signature->GetBufferPointer(),
 										signature->GetBufferSize(),
-										IID_PPV_ARGS(&pRootCompute)));
+										IID_PPV_ARGS(&gRootCompute)));
 
-		NAME_D3D12_OBJECT(pRootCompute);
+		NAME_D3D12_OBJECT(gRootCompute);
 	}
 
 	ComPtr<ID3DBlob> computeBlob;
@@ -230,23 +255,20 @@ int main(int, char**)
 						   nullptr));
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
-	cpsd.pRootSignature					   = pRootCompute.Get();
+	cpsd.pRootSignature					   = gRootCompute.Get();
 	cpsd.CS.pShaderBytecode				   = computeBlob->GetBufferPointer();
 	cpsd.CS.BytecodeLength				   = computeBlob->GetBufferSize();
 	cpsd.NodeMask						   = 0;
-	ComPtr<ID3D12PipelineState> pComputePipeline;
-	TIF(device->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&pComputePipeline)));
+	
+	TIF(device->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&gComputePipeline)));
 
-	ComPtr<ID3D12CommandAllocator> pComputeAllocator;
 	ComPtr<ID3D12GraphicsCommandList> pComputeList;
 
 	ComputeQueue computeQueue(device.GetDevice());
-	TIF(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE,
-									   IID_PPV_ARGS(&pComputeAllocator)));
-	NAME_D3D12_OBJECT(pComputeAllocator);
+
 	device->CreateCommandList(0,
 							  D3D12_COMMAND_LIST_TYPE_COMPUTE,
-							  pComputeAllocator.Get(),
+							  fm.GetReadyFrame(&sc)->GetComputeAllocator(),
 							  nullptr,
 							  IID_PPV_ARGS(&pComputeList));
 	pComputeList->Close();
@@ -302,67 +324,67 @@ int main(int, char**)
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
 
-	ComPtr<ID3D12Resource> posbuffer;
+	
 	TIF(device->CreateCommittedResource(&defaultHeap,
 										D3D12_HEAP_FLAG_NONE,
 										&bufferDesc,
 										D3D12_RESOURCE_STATE_COPY_DEST,
 										nullptr,
-										IID_PPV_ARGS(&posbuffer)));
-	NAME_D3D12_OBJECT(posbuffer);
-	
+										IID_PPV_ARGS(&gPosbuffer)));
+	NAME_D3D12_OBJECT(gPosbuffer);
+
 	//Create Upload Heap for all the transfers
 
-	UINT vertexSize = vbDesc.SizeInBytes;  
-	UINT gridSize = grid.GetVertexSize(); 
-	UINT posSize = bufferDesc.Width;
+	UINT vertexSize = vbDesc.SizeInBytes;
+	UINT gridSize   = grid.GetVertexSize();
+	UINT posSize	= bufferDesc.Width;
 
-	UINT transferSize = (vertexSize + gridSize + posSize); 
+	UINT transferSize = (vertexSize + gridSize + posSize);
 
-	copyList.CreateUploadHeap(device.GetDevice(), transferSize); 
+	copyList.CreateUploadHeap(device.GetDevice(), transferSize);
 
-	D3D12_SUBRESOURCE_DATA subResources[3]; 
-	
+	D3D12_SUBRESOURCE_DATA subResources[3];
+
 	//Vertex Transfer Data
-	subResources[0].pData		 = vbDesc.pData; 
-	subResources[0].RowPitch	= vbDesc.SizeInBytes; 
-	subResources[0].SlicePitch  = subResources[0].RowPitch; 
+	subResources[0].pData	  = vbDesc.pData;
+	subResources[0].RowPitch   = vbDesc.SizeInBytes;
+	subResources[0].SlicePitch = subResources[0].RowPitch;
 
 	//Grid Transfer Data
-	subResources[1].pData = grid.GetDataVector().data();  
-	subResources[1].RowPitch = grid.GetVertexBuffer()->GetBufferData().RowPitch; 
-	subResources[1].SlicePitch = subResources[1].RowPitch; 
-	
+	subResources[1].pData	  = grid.GetDataVector().data();
+	subResources[1].RowPitch   = grid.GetVertexBuffer()->GetBufferData().RowPitch;
+	subResources[1].SlicePitch = subResources[1].RowPitch;
+
 	//Position Transfer Data
-	subResources[2].pData = positions;
-	subResources[2].RowPitch = bufferDesc.Width;
+	subResources[2].pData	  = positions;
+	subResources[2].RowPitch   = bufferDesc.Width;
 	subResources[2].SlicePitch = subResources[2].RowPitch;
 
 	//Schedule the Vertex transfer
 	copyList.ScheduleCopy(
-		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0); 
+		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0);
 
-	//Schedule the Grid transfer.	
+	//Schedule the Grid transfer.
 	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
 						  copyList.GetUploadHeap().Get(),
 						  subResources[1],
-						  vertexSize); 
+						  vertexSize);
 
-	//Schedule the Position transfer. 
-	copyList.ScheduleCopy(posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize)); 
-
+	//Schedule the Position transfer.
+	copyList.ScheduleCopy(
+		gPosbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize));
 
 	//Submit and execute
-	copyCommandQueue.SubmitList(copyList.GetList().Get()); 
-	
-	copyList.GetList().Get()->Close(); 
+	copyCommandQueue.SubmitList(copyList.GetList().Get());
+
+	copyList.GetList().Get()->Close();
 
 	copyCommandQueue.Execute();
 	copyCommandQueue.WaitForGPU();
-	
+
 	ID3D12Resource* vResources[2];
-	vResources[0] = boxBuffer.GetBufferResource(); 
-	vResources[1] = grid.GetVertexBuffer()->GetBufferResource(); 
+	vResources[0] = boxBuffer.GetBufferResource();
+	vResources[1] = grid.GetVertexBuffer()->GetBufferResource();
 
 	/*D3D12_RESOURCE_BARRIER vertexBarrier;
 	vertexBarrier.Transition.pResource   = *vResources;
@@ -382,7 +404,6 @@ int main(int, char**)
 	posBarrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
 	copyList.GetList().Get()->ResourceBarrier(1, &posBarrier);*/
 
-
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
 	srvDesc.Buffer.NumElements				= ARRAYSIZE(positions);
@@ -393,7 +414,7 @@ int main(int, char**)
 	srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
 	device->CreateShaderResourceView(
-		posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
+		gPosbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
@@ -408,7 +429,7 @@ int main(int, char**)
 	UINT descSize =
 		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	offHeap.ptr += descSize;
-	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
+	device->CreateUnorderedAccessView(gPosbuffer.Get(), nullptr, &uavDesc, offHeap);
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
@@ -468,9 +489,10 @@ int main(int, char**)
 			camera.update(deltaTime);
 		}
 
+		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 		// Compute
-		TIF(pComputeAllocator->Reset());
-		TIF(pComputeList->Reset(pComputeAllocator.Get(), pComputePipeline.Get()));
+		TIF(frameCtxt->GetComputeAllocator()->Reset());
+		TIF(pComputeList->Reset(frameCtxt->GetComputeAllocator(), gComputePipeline.Get()));
 
 		D3D12_RESOURCE_BARRIER srvToUav = {};
 		srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -480,7 +502,7 @@ int main(int, char**)
 		srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
 		pComputeList->ResourceBarrier(1, &srvToUav);
 
-		pComputeList->SetComputeRootSignature(pRootCompute.Get());
+		pComputeList->SetComputeRootSignature(gRootCompute.Get());
 		ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
 		pComputeList->SetDescriptorHeaps(_countof(ppHeaps2), ppHeaps2);
 
@@ -498,15 +520,16 @@ int main(int, char**)
 		pComputeList->ResourceBarrier(1, &srvToUav);
 
 		TIF(pComputeList->Close());
+
 		computeQueue.SubmitList(pComputeList.Get());
 		computeQueue.Execute();
 		computeQueue.WaitForGPU();
 
 		// Rendering
-		Frame* frameCtxt = fm.GetReadyFrame(&sc);
-		TIF(frameCtxt->GetCommandAllocator()->Reset());
 
-		cl.Prepare(frameCtxt->GetCommandAllocator(), sc.GetCurrentRenderTarget());
+		TIF(frameCtxt->GetDirectAllocator()->Reset());
+
+		cl.Prepare(frameCtxt->GetDirectAllocator(), sc.GetCurrentRenderTarget());
 
 		cl->OMSetRenderTargets(
 			1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
@@ -592,4 +615,69 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 					ImGui::GetIO().Framerate);
 		ImGui::End();
 	}
+}
+
+void CreateThreads(ID3D12Device* _pDevice)
+{
+	for(UINT threadIndex = 0; threadIndex < gThreadCount; threadIndex++)
+	{
+		D3D12_COMMAND_QUEUE_DESC desc = {};
+		desc.Type					  = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+		desc.Flags					  = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		desc.NodeMask				  = 0;
+		desc.Priority				  = 0;
+
+		_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gTComputeQueue[threadIndex]));
+		_pDevice->CreateCommandAllocator(desc.Type, IID_PPV_ARGS(&gTComputeAllocator[threadIndex]));
+		_pDevice->CreateCommandList(desc.NodeMask,
+									desc.Type,
+									gTComputeAllocator[threadIndex].Get(),
+									nullptr,
+									IID_PPV_ARGS(&gTComputeList[threadIndex]));
+		// NOTE(Henrik): Check on the shared flag
+		_pDevice->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTFence[threadIndex]));
+
+		gTEvent[threadIndex] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+		gThreadIndexes[threadIndex] = threadIndex;
+		gThreadHandles[threadIndex] =
+			CreateThread(nullptr,
+						 0,
+						 ThreadProc,
+						 reinterpret_cast<LPVOID>(&gThreadIndexes[threadIndex]),
+						 CREATE_SUSPENDED,
+						 nullptr);
+
+		ResumeThread(gThreadHandles[threadIndex]);
+	}
+}
+
+DWORD WINAPI ThreadProc(LPVOID _pThreadData)
+{
+	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
+
+	ID3D12CommandQueue* pComputeQueue = gTComputeQueue[threadID].Get();
+	ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[threadID].Get();
+	ID3D12GraphicsCommandList* pComputeList = gTComputeList[threadID].Get();
+
+	
+	for(;;)
+	{
+		TIF(pComputeAllocator->Reset());
+		TIF(pComputeList->Reset(pComputeAllocator, gComputePipeline.Get()));
+
+		D3D12_RESOURCE_BARRIER srvToUav = {};
+		srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		srvToUav.Transition.pResource   = gPosbuffer.Get();
+		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		pComputeList->ResourceBarrier(1, &srvToUav);
+
+
+		TIF(pComputeList->Close());
+	}
+
+
+	return 0;
 }
