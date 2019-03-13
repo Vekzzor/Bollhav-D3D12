@@ -141,10 +141,10 @@ int main(int, char**)
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1);
 
 	//Create Vertex
-	size_t size = v.size() * sizeof(XMFLOAT3);
+	//size_t size = v.size() * sizeof(XMFLOAT3);
 	VERTEX_BUFFER_DESC vbDesc;
 	vbDesc.pData		 = v.data();
-	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
+	vbDesc.SizeInBytes   = (v.size() * sizeof(XMFLOAT3) + 255) & ~255;
 	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
 
 
@@ -188,15 +188,18 @@ int main(int, char**)
 	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
 	bufferDesc.Height			   = 1;
-	bufferDesc.Width			   = sizeof(positions);
+	bufferDesc.Width			   = (sizeof(DATA)*nCubes + 255) & ~255;
 	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
 
+
+
 	VERTEX_BUFFER_DESC gridVBDesc;
 	gridVBDesc.pData	 = v.data();
-	gridVBDesc.SizeInBytes = v.size() * sizeof(XMFLOAT3);
+	gridVBDesc.SizeInBytes = (v.size() * sizeof(XMFLOAT3) + 255) & ~255;
 	gridVBDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
+
 
 
 	UINT vertexSize = vbDesc.SizeInBytes;
@@ -206,15 +209,18 @@ int main(int, char**)
 	UINT transferSize					 = (vertexSize + gridSize + posSize);
 	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
+	ComPtr<ID3D12Resource> posResource;
 	dynamicHeap.SetDesc(
 		UINT64(transferSize), heapProperties, 0, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS);
 	dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
+	//dynamicHeap.InsertResource(
+	//	device.GetDevice(), 0, bufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, posResource.Get());
 
 	//Create Vertex
 	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc, &dynamicHeap, 0);
 
 	//Create Grid
-	Grid grid(device.GetDevice(), pRootGraphics.Get(), gridVBDesc, 10, 1,&dynamicHeap,vertexSize);
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), gridVBDesc, 10, 1, &dynamicHeap,posSize+vertexSize);
 
 	//Create Upload Heap for all the transfers
 	copyList.CreateUploadHeap(device.GetDevice(), transferSize);
@@ -236,6 +242,29 @@ int main(int, char**)
 	subResources[2].RowPitch   = bufferDesc.Width;
 	subResources[2].SlicePitch = subResources[2].RowPitch;
 
+
+	//Schedule the Position transfer.
+	copyList.ScheduleCopy(posResource.Get(), copyList.GetUploadHeap().Get(), subResources[2], 0);
+
+	//Schedule the Vertex transfer
+	copyList.ScheduleCopy(
+		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], posSize);
+
+	//Schedule the Grid transfer.
+	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
+						  copyList.GetUploadHeap().Get(),
+						  subResources[1],
+						  posSize+vertexSize);
+
+	
+
+	//Submit and execute
+	copyCommandQueue.SubmitList(copyList.GetList().Get());
+
+	copyList.GetList().Get()->Close();
+
+	copyCommandQueue.Execute();
+	copyCommandQueue.WaitForGPU();
 
 	GraphicsPipelineState gps;
 	auto desc	 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -367,82 +396,17 @@ int main(int, char**)
 
 	
 
-	ComPtr<ID3D12Resource> posbuffer;
-	//TIF(device->CreateCommittedResource(&defaultHeap,
-	//									D3D12_HEAP_FLAG_NONE,
-	//									&bufferDesc,
-	//									D3D12_RESOURCE_STATE_COPY_DEST,
-	//									nullptr,
-	//									IID_PPV_ARGS(posbuffer.GetAddressOf())));
 	
-
-
-
-	//Make sure to create the resources on the GPU
-
-
-
-	
-
-	//Create descriptions for the resources
-
-	//Vertex
-	D3D12_RESOURCE_DESC vResDesc = boxBuffer.GetResourceDesc(); 
-
-	//Grid
-	D3D12_RESOURCE_DESC gridResDesc = grid.GetVertexBuffer()->GetResourceDesc(); 
-
-	//Position 
-	D3D12_RESOURCE_DESC posResDesc = bufferDesc; 
-
-	dynamicHeap.InsertResource(device.GetDevice(),
-							   0,
-							   vResDesc,
-							   D3D12_RESOURCE_STATE_COPY_DEST,
-							   boxBuffer.GetBufferResource());
-
-	dynamicHeap.InsertResource(device.GetDevice(),
-							   0,
-							   gridResDesc,
-							   D3D12_RESOURCE_STATE_COPY_DEST,
-							   grid.GetVertexBuffer()->GetBufferResource());
-
-	dynamicHeap.InsertResource(device.GetDevice(),
-							   0,
-							   posResDesc,
-							   D3D12_RESOURCE_STATE_COPY_DEST,
-							   posbuffer.Get());
-
 	//Name the Resources
 	/*NAME_D3D12_OBJECT(boxBuffer.GetBufferResourceComPtr()); 
 	NAME_D3D12_OBJECT(grid.GetVertexBuffer()->GetBufferResourceComPtr());
 	NAME_D3D12_OBJECT(posbuffer);*/
 
-	//Schedule the Vertex transfer
-	copyList.ScheduleCopy(
-		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0);
 
-	//Schedule the Grid transfer.
-	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
-						  copyList.GetUploadHeap().Get(),
-						  subResources[1],
-						  vertexSize);
 
-	//Schedule the Position transfer.
-	copyList.ScheduleCopy(
-		posbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize));
-
-	//Submit and execute
-	copyCommandQueue.SubmitList(copyList.GetList().Get());
-
-	copyList.GetList().Get()->Close();
-
-	copyCommandQueue.Execute();
-	copyCommandQueue.WaitForGPU();
-
-	ID3D12Resource* vResources[2];
+	/*ID3D12Resource* vResources[2];
 	vResources[0] = boxBuffer.GetBufferResource();
-	vResources[1] = grid.GetVertexBuffer()->GetBufferResource();
+	vResources[1] = grid.GetVertexBuffer()->GetBufferResource();*/
 
 	/*D3D12_RESOURCE_BARRIER vertexBarrier;
 	vertexBarrier.Transition.pResource   = *vResources;
@@ -472,7 +436,7 @@ int main(int, char**)
 	srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
 	device->CreateShaderResourceView(
-		posbuffer.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
+		posResource.Get(), &srvDesc, g_Heap->GetCPUDescriptorHandleForHeapStart());
 
 	HRESULT hr = device->GetDeviceRemovedReason();
 
@@ -489,7 +453,7 @@ int main(int, char**)
 	UINT descSize =
 		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	offHeap.ptr += descSize;
-	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
+	device->CreateUnorderedAccessView(posResource.Get(), nullptr, &uavDesc, offHeap);
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
@@ -632,7 +596,7 @@ int main(int, char**)
 
 		D3D12_RESOURCE_BARRIER srvToUav = {};
 		srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		srvToUav.Transition.pResource   = posbuffer.Get();
+		srvToUav.Transition.pResource   = posResource.Get();
 		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -674,7 +638,7 @@ int main(int, char**)
 		cl->SetGraphicsRootSignature(pRootGraphics.Get());
 		cl->SetGraphicsRoot32BitConstants(
 			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
-		cl->SetGraphicsRootShaderResourceView(2, posbuffer->GetGPUVirtualAddress());
+		cl->SetGraphicsRootShaderResourceView(2, posResource->GetGPUVirtualAddress());
 
 		cl->RSSetViewports(1, &vp);
 		cl->RSSetScissorRects(1, &scissor);

@@ -11,7 +11,7 @@ void DX12Heap::CreateWithCurrentSettings(ID3D12Device4* device)
 {
 	if (m_descriptionSet)
 	{
-		device->CreateHeap(&m_heapDesc,IID_PPV_ARGS(m_heap.GetAddressOf()));
+		TIF(device->CreateHeap(&m_heapDesc,IID_PPV_ARGS(m_heap.GetAddressOf())));
 		m_heapCreated = true; 
 	}
 	else
