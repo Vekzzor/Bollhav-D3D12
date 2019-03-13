@@ -1,11 +1,11 @@
 #include "VertexBuffer.h"
 
-VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT heapOffset)
 {
-	Create(_pDevice, _pDesc);
+	Create(_pDevice, _pDesc, heap, heapOffset);
 }
 
-void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT heapOffset)
 {
 	D3D12_HEAP_PROPERTIES heapProp;
 	heapProp.Type				  = D3D12_HEAP_TYPE_DEFAULT;
@@ -14,25 +14,21 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 	heapProp.CreationNodeMask	 = 1;
 	heapProp.VisibleNodeMask	  = 1;
 
-	D3D12_RESOURCE_DESC desc;
-	desc.Alignment			= 0;
-	desc.DepthOrArraySize   = 1;
-	desc.Dimension			= D3D12_RESOURCE_DIMENSION_BUFFER;
-	desc.Flags				= D3D12_RESOURCE_FLAG_NONE;
-	desc.Format				= DXGI_FORMAT_UNKNOWN;
-	desc.Height				= 1;
-	desc.Width				= _pDesc->SizeInBytes;
-	desc.Layout				= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	desc.MipLevels			= 1;
-	desc.SampleDesc.Count   = 1;
-	desc.SampleDesc.Quality = 0;
+	m_desc.Alignment			= 0;
+	m_desc.DepthOrArraySize   = 1;
+	m_desc.Dimension			= D3D12_RESOURCE_DIMENSION_BUFFER;
+	m_desc.Flags				= D3D12_RESOURCE_FLAG_NONE;
+	m_desc.Format				= DXGI_FORMAT_UNKNOWN;
+	m_desc.Height				= 1;
+	m_desc.Width				= _pDesc->SizeInBytes;
+	m_desc.Layout				= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	m_desc.MipLevels			= 1;
+	m_desc.SampleDesc.Count   = 1;
+	m_desc.SampleDesc.Quality = 0;
 
-	TIF(_pDevice->CreateCommittedResource(&heapProp,
-										  D3D12_HEAP_FLAG_NONE,
-										  &desc,
-										  D3D12_RESOURCE_STATE_GENERIC_READ,
-										  nullptr,
-										  IID_PPV_ARGS(&m_pVertexData)));
+
+	heap->InsertResource(
+		_pDevice, heapOffset, m_desc, D3D12_RESOURCE_STATE_COPY_DEST, m_pVertexData.Get()); 
 
 	//Just something to hold the data for transfer to the GPU.
 	m_vbData.pData	  = m_pVertexData.Get();
@@ -41,8 +37,8 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 
   
 	//Init view
-	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
-	m_BufferView.SizeInBytes	= desc.Width;
+	//m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();
+	m_BufferView.SizeInBytes	= m_desc.Width;
 	m_BufferView.StrideInBytes  = _pDesc->StrideInBytes;
 
 	m_VertexCount = m_BufferView.SizeInBytes / m_BufferView.StrideInBytes;
@@ -63,7 +59,17 @@ ID3D12Resource* VertexBuffer::GetBufferResource()
 	return m_pVertexData.Get();
 }
 
+ComPtr<ID3D12Resource> VertexBuffer::GetBufferResourceComPtr()
+{
+	return m_pVertexData;
+}
+
 const D3D12_SUBRESOURCE_DATA& VertexBuffer::GetBufferData() const
 {
 	return m_vbData; 
+}
+
+D3D12_RESOURCE_DESC& VertexBuffer::GetResourceDesc()
+{
+	return m_desc; 
 }

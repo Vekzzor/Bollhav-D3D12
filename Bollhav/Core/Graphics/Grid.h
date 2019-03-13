@@ -5,7 +5,12 @@
 class Grid
 {
 public:
-	Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing);
+	Grid(ID3D12Device4* _pDevice,
+		 ID3D12RootSignature* _pSignature,
+		 VERTEX_BUFFER_DESC& vbDesc, UINT _Width,
+		 UINT _Spacing,
+		 DX12Heap* heap,
+		 UINT heapOffset);
 
 	void Draw(ID3D12GraphicsCommandList* _pCmdList);
 

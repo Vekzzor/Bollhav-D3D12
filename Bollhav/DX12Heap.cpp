@@ -29,7 +29,7 @@ void DX12Heap::InsertResource(ID3D12Device4* device,
 {
 	if(m_heapCreated)
 	{
-		device->CreatePlacedResource(m_heap.Get(), offset, &resDesc, resState,0,IID_PPV_ARGS(&res));
+		TIF(device->CreatePlacedResource(m_heap.Get(), offset, &resDesc, resState,0,IID_PPV_ARGS(&res)));
 	}
 	else
 	{

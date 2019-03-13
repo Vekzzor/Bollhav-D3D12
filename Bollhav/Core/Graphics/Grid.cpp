@@ -1,7 +1,7 @@
 #include "Grid.h"
 #include "pch.h"
 
-Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Width, UINT _Spacing)
+Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, VERTEX_BUFFER_DESC& vbDesc,  UINT _Width, UINT _Spacing, DX12Heap* heap, UINT heapOffset)
 {
 	// Create the vertices
 	std::vector<XMFLOAT3> vertices;
@@ -23,15 +23,12 @@ Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, UINT _Widt
 		vertices.push_back(p3);
 	}
 	// Create the vertex buffer
-	VERTEX_BUFFER_DESC vbd;
-	vbd.pData		  = reinterpret_cast<LPVOID>(vertices.data());
-	vbd.StrideInBytes = sizeof(vertices[0]);
-	vbd.SizeInBytes   = vbd.StrideInBytes * vertices.size();
-	m_VertexBuffer.Create(_pDevice, &vbd);
+
+	m_VertexBuffer.Create(_pDevice, &vbDesc,heap,heapOffset);
 
 	//For use for upload heap creation later. 
-	m_vertexSize = vbd.SizeInBytes;
-	m_vertexData = vbd.pData; 
+	m_vertexSize = vbDesc.SizeInBytes;
+	m_vertexData = vbDesc.pData; 
 	m_dataVector = vertices; 
 
 	// Create the pipelinestate
