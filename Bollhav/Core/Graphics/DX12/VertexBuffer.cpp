@@ -1,11 +1,11 @@
 #include "VertexBuffer.h"
 
-VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+VertexBuffer::VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT heapOffset)
 {
-	Create(_pDevice, _pDesc);
+	Create(_pDevice, _pDesc, heap, heapOffset);
 }
 
-void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
+void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT heapOffset)
 {
 	D3D12_HEAP_PROPERTIES heapProp;
 	heapProp.Type				  = D3D12_HEAP_TYPE_DEFAULT;
@@ -27,18 +27,14 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 	desc.SampleDesc.Count   = 1;
 	desc.SampleDesc.Quality = 0;
 
-	TIF(_pDevice->CreateCommittedResource(&heapProp,
-										  D3D12_HEAP_FLAG_NONE,
-										  &desc,
-										  D3D12_RESOURCE_STATE_GENERIC_READ,
-										  nullptr,
-										  IID_PPV_ARGS(&m_pVertexData)));
-
 	//Just something to hold the data for transfer to the GPU.
-	m_vbData.pData	  = m_pVertexData.Get();
-	m_vbData.RowPitch   = sizeof(m_pVertexData);
+	m_vbData.pData	  = _pDesc->pData;
+	m_vbData.RowPitch   = _pDesc->SizeInBytes;
 	m_vbData.SlicePitch = m_vbData.RowPitch;
 
+
+	heap->InsertResource(
+		_pDevice, heapOffset, desc, D3D12_RESOURCE_STATE_COPY_DEST, m_pVertexData.Get()); 
   
 	//Init view
 	m_BufferView.BufferLocation = m_pVertexData->GetGPUVirtualAddress();

@@ -12,9 +12,9 @@ class VertexBuffer
 {
 public:
 	VertexBuffer() = default;
-	VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc);
+	VertexBuffer(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT offsetHeap);
 
-	void Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc);
+	void Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc, DX12Heap* heap, UINT offsetHeap);
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVertexView() const;
 	UINT GetVertexCount() const;
