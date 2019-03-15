@@ -35,3 +35,8 @@ void ComputeQueue::WaitForGPU()
 	m_FenceSignal++;
 	WaitForSingleObject(m_hFenceEvent, INFINITE);
 }
+
+void ComputeQueue::GetTimestampFrequency(UINT64* qFrec) 
+{
+	m_pCommandQueue->GetTimestampFrequency(qFrec);
+}

@@ -21,6 +21,7 @@ struct VertexOut
     float4 position : SV_POSITION;
     float3 worldPosition : POSITION;
     float3 normal : NORMAL;
+	float3 velocity : COLOR;
 };
 
 VertexOut vs_main(in VertexIn input, in uint instanceID : SV_InstanceID)
@@ -31,5 +32,6 @@ VertexOut vs_main(in VertexIn input, in uint instanceID : SV_InstanceID)
     output.worldPosition = output.position.xyz;
     output.position = mul(matIndex, output.position);
     output.normal = input.normal;
+	output.velocity = normalize(test[instanceID].vel);
     return output;
 }

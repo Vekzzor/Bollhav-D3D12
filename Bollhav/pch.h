@@ -36,6 +36,7 @@ using namespace Microsoft::WRL;
 //Helper
 #include "HelperFunctions.h"
 #include "DX12Heap.h"
+#include "D3D12Timer.h"
 
 // ImGui
 #include <Utility/imgui.h>

@@ -165,6 +165,7 @@
     <ClCompile Include="Core\Input\Input.cpp" />
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
+    <ClCompile Include="D3D12Timer.cpp" />
     <ClCompile Include="DX12Heap.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Utility\ObjLoader.cpp" />
@@ -196,6 +197,7 @@
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
+    <ClInclude Include="D3D12Timer.h" />
     <ClInclude Include="DX12Heap.h" />
     <ClInclude Include="HelperFunctions.h" />
     <ClInclude Include="Utility\d3dx12.h" />

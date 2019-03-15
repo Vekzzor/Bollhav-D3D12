@@ -30,6 +30,7 @@
     <ClCompile Include="Core\Graphics\DX12\DepthStencil.cpp" />
     <ClCompile Include="Core\Compute\ComputeQueue.cpp" />
     <ClCompile Include="DX12Heap.cpp" />
+    <ClCompile Include="D3D12Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Compute\GPUComputing.h" />
@@ -64,6 +65,7 @@
     <ClInclude Include="Core\Compute\ComputeQueue.h" />
     <ClInclude Include="HelperFunctions.h" />
     <ClInclude Include="DX12Heap.h" />
+    <ClInclude Include="D3D12Timer.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\LineVS.hlsl" />
