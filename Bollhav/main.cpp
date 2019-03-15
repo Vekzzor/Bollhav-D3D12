@@ -205,10 +205,7 @@ int main(int, char**)
 	UINT vertexSize = (vbDesc.SizeInBytes + 65535) & ~65535;
 	UINT gridSize   = (gridVBDesc.SizeInBytes + 65535) & ~65535; 
 	UINT posSize	= (bufferDesc.Width + 65535) & ~65535;
-
-	UINT transferSize1					 = (vertexSize + gridSize + posSize);
 	UINT transferSize					 = vertexSize + gridSize + posSize;
-	static const UINT STATIC_ALIGNMENT_SIZE  = 65536;
 
 	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
@@ -229,11 +226,12 @@ int main(int, char**)
 			  &dynamicHeap,
 			  vertexSize);
 
-	dynamicHeap.InsertResource(device.GetDevice(),
+	ID3D12Resource* resource = dynamicHeap.InsertResource(device.GetDevice(),
 							   vertexSize+gridSize,
 							   bufferDesc,
 							   D3D12_RESOURCE_STATE_COPY_DEST,
 							   posResource.Get());
+	posResource.Attach(resource);
 
 	//Create Upload Heap for all the transfers
 	copyList.CreateUploadHeap(device.GetDevice(), transferSize);
@@ -265,11 +263,11 @@ int main(int, char**)
 	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
 						  copyList.GetUploadHeap().Get(),
 						  subResources[1],
-						  STATIC_ALIGNMENT_SIZE);
+						  vertexSize);
 
 	//Schedule the Position transfer.
 	copyList.ScheduleCopy(
-		posResource.Get(), copyList.GetUploadHeap().Get(), subResources[2], STATIC_ALIGNMENT_SIZE*2);
+		posResource.Get(), copyList.GetUploadHeap().Get(), subResources[2], vertexSize + gridSize);
 
 	//Submit and execute
 	copyCommandQueue.SubmitList(copyList.GetList().Get());

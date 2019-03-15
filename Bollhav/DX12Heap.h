@@ -17,7 +17,7 @@ public:
 
 	void CreateWithCurrentSettings(ID3D12Device4* device);
 
-	void InsertResource(ID3D12Device4* device,
+	ID3D12Resource* InsertResource(ID3D12Device4* device,
 						UINT offset,
 						D3D12_RESOURCE_DESC resDesc,
 						D3D12_RESOURCE_STATES resState,

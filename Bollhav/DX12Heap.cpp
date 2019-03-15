@@ -21,21 +21,25 @@ void DX12Heap::CreateWithCurrentSettings(ID3D12Device4* device)
 	}
 }
 
-void DX12Heap::InsertResource(ID3D12Device4* device,
+ID3D12Resource* DX12Heap::InsertResource(ID3D12Device4* device,
 							  UINT offset,
 							  D3D12_RESOURCE_DESC resDesc,
 							  D3D12_RESOURCE_STATES resState,
 							  ID3D12Resource* res)
 {
+	UINT test = 0;
 	if(m_heapCreated)
 	{
 		TIF(device->CreatePlacedResource(m_heap.Get(), offset, &resDesc, resState,0,IID_PPV_ARGS(&res)));
+		test = res->GetGPUVirtualAddress();
 	}
 	else
 	{
 		std::cout << "RESOURCE COULD NOT BE INSERTED: NO HEAP IS CREATED." << std::endl;
 		exit(0);
 	}
+
+	return res;
 }
 
 ID3D12Heap* DX12Heap::Get()
