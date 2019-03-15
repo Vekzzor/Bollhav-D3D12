@@ -491,6 +491,9 @@ int main(int, char**)
 	std::chrono::time_point<std::chrono::steady_clock> currentTime =
 		std::chrono::steady_clock::now();
 
+	D3D12::D3D12Timer computeTimer;
+	computeTimer.init(device.GetDevice(), 1);
+	double timeInMs = 0;
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
@@ -719,6 +722,16 @@ int main(int, char**)
 			sc.Present();
 
 			fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
+
+			//get time in ms
+			UINT64 queueFreq;
+			computeQueue.GetTimestampFrequency(&queueFreq);
+			double timestampToMs = (1.0 / queueFreq) * 1000.0;
+
+			D3D12::GPUTimestampPair drawTime = computeTimer.getTimestampPair(0);
+
+			UINT64 dt = drawTime.Stop - drawTime.Start;
+			timeInMs  = dt * timestampToMs;
 		}
 
 		currentTime = std::chrono::steady_clock::now();
