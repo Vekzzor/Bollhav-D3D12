@@ -144,7 +144,7 @@ int main(int, char**)
 	//size_t size = v.size() * sizeof(XMFLOAT3);
 	VERTEX_BUFFER_DESC vbDesc;
 	vbDesc.pData		 = v.data();
-	vbDesc.SizeInBytes   = (v.size() * sizeof(XMFLOAT3) + 255) & ~255;
+	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
 	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
 
 
@@ -188,7 +188,7 @@ int main(int, char**)
 	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
 	bufferDesc.Height			   = 1;
-	bufferDesc.Width			   = (sizeof(DATA)*nCubes + 255) & ~255;
+	bufferDesc.Width			   = sizeof(DATA)*nCubes;
 	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
@@ -197,30 +197,43 @@ int main(int, char**)
 
 	VERTEX_BUFFER_DESC gridVBDesc;
 	gridVBDesc.pData	 = v.data();
-	gridVBDesc.SizeInBytes = (v.size() * sizeof(XMFLOAT3) + 255) & ~255;
+	gridVBDesc.SizeInBytes = v.size() * sizeof(XMFLOAT3);
 	gridVBDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
 
 
 
-	UINT vertexSize = vbDesc.SizeInBytes;
-	UINT gridSize   = gridVBDesc.SizeInBytes; 
-	UINT posSize	= bufferDesc.Width;
+	UINT vertexSize = (vbDesc.SizeInBytes + 65535) & ~65535;
+	UINT gridSize   = (gridVBDesc.SizeInBytes + 65535) & ~65535; 
+	UINT posSize	= (bufferDesc.Width + 65535) & ~65535;
 
-	UINT transferSize					 = (vertexSize + gridSize + posSize);
+	UINT transferSize1					 = (vertexSize + gridSize + posSize);
+	UINT transferSize					 = vertexSize + gridSize + posSize;
+	static const UINT STATIC_ALIGNMENT_SIZE  = 65536;
+
 	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
 	ComPtr<ID3D12Resource> posResource;
 	dynamicHeap.SetDesc(
 		UINT64(transferSize), heapProperties, 0, D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS);
 	dynamicHeap.CreateWithCurrentSettings(device.GetDevice());
-	//dynamicHeap.InsertResource(
-	//	device.GetDevice(), 0, bufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, posResource.Get());
 
 	//Create Vertex
 	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc, &dynamicHeap, 0);
 
 	//Create Grid
-	Grid grid(device.GetDevice(), pRootGraphics.Get(), gridVBDesc, 10, 1, &dynamicHeap,posSize+vertexSize);
+	Grid grid(device.GetDevice(),
+			  pRootGraphics.Get(),
+			  gridVBDesc,
+			  10,
+			  1,
+			  &dynamicHeap,
+			  vertexSize);
+
+	dynamicHeap.InsertResource(device.GetDevice(),
+							   vertexSize+gridSize,
+							   bufferDesc,
+							   D3D12_RESOURCE_STATE_COPY_DEST,
+							   posResource.Get());
 
 	//Create Upload Heap for all the transfers
 	copyList.CreateUploadHeap(device.GetDevice(), transferSize);
@@ -243,20 +256,20 @@ int main(int, char**)
 	subResources[2].SlicePitch = subResources[2].RowPitch;
 
 
-	//Schedule the Position transfer.
-	copyList.ScheduleCopy(posResource.Get(), copyList.GetUploadHeap().Get(), subResources[2], 0);
 
 	//Schedule the Vertex transfer
 	copyList.ScheduleCopy(
-		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], posSize);
+		boxBuffer.GetBufferResource(), copyList.GetUploadHeap().Get(), subResources[0], 0);
 
 	//Schedule the Grid transfer.
 	copyList.ScheduleCopy(grid.GetVertexBuffer()->GetBufferResource(),
 						  copyList.GetUploadHeap().Get(),
 						  subResources[1],
-						  posSize+vertexSize);
+						  STATIC_ALIGNMENT_SIZE);
 
-	
+	//Schedule the Position transfer.
+	copyList.ScheduleCopy(
+		posResource.Get(), copyList.GetUploadHeap().Get(), subResources[2], STATIC_ALIGNMENT_SIZE*2);
 
 	//Submit and execute
 	copyCommandQueue.SubmitList(copyList.GetList().Get());
