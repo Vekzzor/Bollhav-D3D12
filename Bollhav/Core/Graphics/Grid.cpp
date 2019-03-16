@@ -1,7 +1,13 @@
 #include "Grid.h"
 #include "pch.h"
 
-Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, VERTEX_BUFFER_DESC& vbDesc,  UINT _Width, UINT _Spacing, DX12Heap* heap, UINT heapOffset)
+Grid::Grid(ID3D12Device4* _pDevice,
+		   ID3D12RootSignature* _pSignature,
+		   VERTEX_BUFFER_DESC& vbDesc,
+		   UINT _Width,
+		   UINT _Spacing,
+		   DX12Heap* heap,
+		   UINT heapOffset)
 {
 	// Create the vertices
 	std::vector<XMFLOAT3> vertices;
@@ -24,12 +30,16 @@ Grid::Grid(ID3D12Device4* _pDevice, ID3D12RootSignature* _pSignature, VERTEX_BUF
 	}
 	// Create the vertex buffer
 
-	m_VertexBuffer.Create(_pDevice, &vbDesc,heap,heapOffset);
+	//For use for upload heap creation later.
+	vbDesc.StrideInBytes = sizeof(vertices[0]);
+	vbDesc.SizeInBytes   = vertices.size() * vbDesc.StrideInBytes;
+	vbDesc.pData		 = vertices.data();
 
-	//For use for upload heap creation later. 
 	m_vertexSize = vbDesc.SizeInBytes;
-	m_vertexData = vbDesc.pData; 
-	m_dataVector = vertices; 
+	m_vertexData = vbDesc.pData;
+	m_dataVector = vertices;
+
+	m_VertexBuffer.Create(_pDevice, &vbDesc, heap, heapOffset);
 
 	// Create the pipelinestate
 	m_Pipeline.SetTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
@@ -56,7 +66,7 @@ VertexBuffer* Grid::GetVertexBuffer()
 
 const UINT Grid::GetVertexSize() const
 {
-	return m_vertexSize; 
+	return m_vertexSize;
 }
 
 const LPVOID Grid::GetVertexData() const
@@ -66,5 +76,5 @@ const LPVOID Grid::GetVertexData() const
 
 const std::vector<XMFLOAT3>& Grid::GetDataVector() const
 {
-	return m_dataVector; 
+	return m_dataVector;
 }
