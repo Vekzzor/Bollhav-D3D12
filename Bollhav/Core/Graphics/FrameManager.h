@@ -9,6 +9,7 @@ public:
 	Frame* GetReadyFrame(Swapchain* _pSwapChain);
 	void WaitForLastSubmittedFrame();
 	void SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue);
+	ID3D12Fence* GetFencePtr();
 private:
 	Frame m_Frames[NUM_BACKBUFFERS];
 	UINT m_iFrameIndex;

@@ -55,3 +55,8 @@ void FrameManager::SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue)
 	m_fenceLastSignaledValue = fenceValue;
 	_pFrame->SetFenceValue(fenceValue);
 }
+
+ID3D12Fence* FrameManager::GetFencePtr()
+{
+	return m_pFence.Get();
+}

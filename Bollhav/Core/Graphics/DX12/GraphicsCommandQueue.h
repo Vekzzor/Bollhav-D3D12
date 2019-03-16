@@ -11,6 +11,7 @@ public:
 
 	void WaitForGPU();
 
+	ID3D12CommandQueue* operator->(void);
 private:
 	std::vector<ID3D12CommandList*> m_pExecuteList;
 	ComPtr<ID3D12CommandQueue> m_pCommandQueue;

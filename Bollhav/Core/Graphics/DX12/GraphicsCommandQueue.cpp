@@ -39,3 +39,8 @@ void GraphicsCommandQueue::WaitForGPU()
 	m_FenceSignal++;
 	WaitForSingleObject(m_hFenceEvent, INFINITE);
 }
+
+ID3D12CommandQueue* GraphicsCommandQueue::operator->(void)
+{
+	return m_pCommandQueue.Get();
+}

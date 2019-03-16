@@ -49,9 +49,7 @@
     <ClInclude Include="Utility\imstb_truetype.h" />
     <ClInclude Include="Utility\d3dx12.h" />
     <ClInclude Include="Core\Camera\FPSCamera.h" />
-
     <ClInclude Include="CopyList.h" />
-
     <ClInclude Include="Utility\ObjLoader.h" />
     <ClInclude Include="Core\Graphics\DX12\CommandList.h" />
     <ClInclude Include="Core\Graphics\DX12\ConstantBuffer.h" />
@@ -63,7 +61,6 @@
     <ClInclude Include="Core\Graphics\Grid.h" />
     <ClInclude Include="Core\Graphics\DX12\DepthStencil.h" />
     <ClInclude Include="Core\Compute\ComputeQueue.h" />
-
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\LineVS.hlsl" />
@@ -71,8 +68,5 @@
     <FxCompile Include="Shaders\CubeVS.hlsl" />
     <FxCompile Include="Shaders\CubePS.hlsl" />
     <FxCompile Include="Shaders\ComputeShader.hlsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram.cd" />
   </ItemGroup>
 </Project>
