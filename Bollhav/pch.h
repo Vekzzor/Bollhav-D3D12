@@ -13,8 +13,9 @@ using namespace DirectX;
 
 constexpr int NUM_BACKBUFFERS = 3;
 
+#include <pix3.h>
 #include <wrl.h>
-using namespace Microsoft::WRL;
+	using namespace Microsoft::WRL;
 
 // Window
 #ifndef WIN32_LEAN_AND_MEAN

@@ -62,7 +62,6 @@ int main(int, char**)
 
 	Device device;
 
-	
 	Swapchain sc(device.GetDevice());
 	GraphicsCommandQueue CommandQueue(device.GetDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -415,8 +414,8 @@ int main(int, char**)
 		device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	offHeap.ptr += gDescriptorSize;
 	device->CreateUnorderedAccessView(gPosbuffer.Get(), nullptr, &uavDesc, offHeap);
-	
-	for (UINT i = 0; i < gThreadCount; i++)
+
+	for(UINT i = 0; i < gThreadCount; i++)
 	{
 		gTRenderFence[i] = fm.GetFencePtr();
 	}
@@ -486,9 +485,11 @@ int main(int, char**)
 		{
 			// This makes the threads pass Wait point 1
 			// We need to pass the actuall fence value
-			InterlockedExchange(&gTRenderFenceValue[threadID], frameCtxt->GetFenceValue());
+			UINT64 val = frameCtxt->GetFenceValue();
+			
+			InterlockedExchange(&gTRenderFenceValue[threadID],val);
 		}
-		
+
 		// Now lets wait for the compute to finish
 		for(UINT threadID = 0; threadID < gThreadCount; threadID++)
 		{
@@ -497,10 +498,12 @@ int main(int, char**)
 			{
 				// Instruct the queue to wait for the current compute work to finish
 				CommandQueue->Wait(gTComputeFence[threadID].Get(), fenceVal);
+				std::cout << fenceVal << '\n';
 			}
 		}
-	
+
 		// Rendering
+		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
 
 		TIF(frameCtxt->GetDirectAllocator()->Reset());
 
@@ -541,7 +544,7 @@ int main(int, char**)
 
 		CommandQueue.SubmitList(cl.GetPtr());
 		CommandQueue.Execute();
-
+		PIXEndEvent(CommandQueue.GetCommandQueue());
 		sc.Present();
 
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
@@ -616,7 +619,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 		_pDevice->CreateFence(gTComputeFenceValue[threadIndex],
 							  D3D12_FENCE_FLAG_SHARED,
 							  IID_PPV_ARGS(&gTComputeFence[threadIndex]));
-		
+
 		gTEvent[threadIndex] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 		gThreadIndexes[threadIndex] = threadIndex;
@@ -640,10 +643,11 @@ DWORD WINAPI ThreadProc(LPVOID _pThreadData)
 	ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[threadID].Get();
 	ID3D12GraphicsCommandList* pComputeList   = gTComputeList[threadID].Get();
 	ID3D12Fence* pComputeFence				  = gTComputeFence[threadID].Get();
+	unsigned int backbufferIndex			  = 0;
 	for(;;)
 	{
 		// Run the compute shader
-
+		PIXBeginEvent(pComputeQueue, 0, L"Compute");
 		D3D12_RESOURCE_BARRIER srvToUav = {};
 		srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		srvToUav.Transition.pResource   = gPosbuffer.Get();
@@ -670,7 +674,7 @@ DWORD WINAPI ThreadProc(LPVOID _pThreadData)
 		pComputeList->ResourceBarrier(1, &srvToUav);
 
 		TIF(pComputeList->Close());
-
+		
 		// Execute
 		ID3D12CommandList* Lists[] = {pComputeList};
 		pComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
@@ -680,7 +684,9 @@ DWORD WINAPI ThreadProc(LPVOID _pThreadData)
 		TIF(pComputeQueue->Signal(gTComputeFence[threadID].Get(), threadFenceValue));
 		TIF(gTComputeFence[threadID]->SetEventOnCompletion(threadFenceValue, gTEvent[threadID]));
 		WaitForSingleObject(gTEvent[threadID], INFINITE);
-	
+		PIXEndEvent(pComputeQueue);
+
+		// Här är compute klar
 
 		// Wait point 1:
 		// Then we wait for the direct queue to finish

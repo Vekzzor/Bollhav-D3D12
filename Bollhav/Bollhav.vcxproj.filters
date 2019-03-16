@@ -69,4 +69,7 @@
     <FxCompile Include="Shaders\CubePS.hlsl" />
     <FxCompile Include="Shaders\ComputeShader.hlsl" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>
