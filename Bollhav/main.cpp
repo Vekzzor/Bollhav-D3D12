@@ -35,6 +35,19 @@ struct DATA
 	float vx, vy, vz; // Velocity
 };
 
+struct CBData
+{
+	UINT numCubes  = 128;
+	UINT numBlocks = 1;
+
+	float dt		 = 0.001f;
+	float damping	= 1.0f;
+	float centerMass = 10000.0f * 10000.0f;
+} cbData{};
+
+static double computeTimeInMs	= 0;
+static double renderTimeInMs	 = 0;
+static double totalFrameTimeInMs = 0;
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ComPtr<ID3D12DescriptorHeap> g_Heap;
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -155,7 +168,7 @@ int main(int, char**)
 	/*Before creating a buffer of any kind, a heap has to be created since 
 	that is what we will store the buffer resource in.*/
 	DX12Heap dynamicHeap;
-	
+
 	dynamicHeap.SetProperties(
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 1, 1);
 
@@ -166,24 +179,12 @@ int main(int, char**)
 	vbDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
 	vbDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
 
-
 	//Create Positions
 	constexpr UINT blockSize = 128;
-	UINT nCubes				 = (blockSize * blockSize) * 2;
+	UINT nCubes				 = (blockSize * blockSize) * 3;
 
 	DATA* positions = new DATA[nCubes];
 	CreateParticleFormation(ParticleFormation::Wormhole, positions, nCubes, blockSize);
-	
-	struct CBData
-	{
-		UINT numCubes  = 128;
-		UINT numBlocks = 1;
-
-		float dt		 = 0.001f;
-		float damping	= 1.0f;
-		float centerMass = 10000.0f * 10000.0f;
-	} cbData{};
-
 
 	//D3D12_HEAP_PROPERTIES defaultHeap = {};
 	//defaultHeap.CPUPageProperty		  = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -199,24 +200,20 @@ int main(int, char**)
 	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
 	bufferDesc.Height			   = 1;
-	bufferDesc.Width			   = sizeof(DATA)*nCubes;
+	bufferDesc.Width			   = sizeof(DATA) * nCubes;
 	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
 
-
-
 	VERTEX_BUFFER_DESC gridVBDesc;
-	gridVBDesc.pData	 = v.data();
-	gridVBDesc.SizeInBytes = v.size() * sizeof(XMFLOAT3);
+	gridVBDesc.pData		 = v.data();
+	gridVBDesc.SizeInBytes   = v.size() * sizeof(XMFLOAT3);
 	gridVBDesc.StrideInBytes = sizeof(XMFLOAT3) * 2;
 
-
-
-	UINT vertexSize = (vbDesc.SizeInBytes + 65535) & ~65535;
-	UINT gridSize   = (gridVBDesc.SizeInBytes + 65535) & ~65535; 
-	UINT posSize	= (bufferDesc.Width + 65535) & ~65535;
-	UINT transferSize					 = vertexSize + gridSize + posSize;
+	UINT vertexSize   = (vbDesc.SizeInBytes + 65535) & ~65535;
+	UINT gridSize	 = (gridVBDesc.SizeInBytes + 65535) & ~65535;
+	UINT posSize	  = (bufferDesc.Width + 65535) & ~65535;
+	UINT transferSize = vertexSize + gridSize + posSize;
 
 	D3D12_HEAP_PROPERTIES heapProperties = dynamicHeap.GetProperties();
 
@@ -229,19 +226,13 @@ int main(int, char**)
 	VertexBuffer boxBuffer(device.GetDevice(), &vbDesc, &dynamicHeap, 0);
 
 	//Create Grid
-	Grid grid(device.GetDevice(),
-			  pRootGraphics.Get(),
-			  gridVBDesc,
-			  10,
-			  1,
-			  &dynamicHeap,
-			  vertexSize);
+	Grid grid(device.GetDevice(), pRootGraphics.Get(), gridVBDesc, 10, 1, &dynamicHeap, vertexSize);
 
 	ID3D12Resource* resource = dynamicHeap.InsertResource(device.GetDevice(),
-							   vertexSize+gridSize,
-							   bufferDesc,
-							   D3D12_RESOURCE_STATE_COPY_DEST,
-							   posResource.Get());
+														  vertexSize + gridSize,
+														  bufferDesc,
+														  D3D12_RESOURCE_STATE_COPY_DEST,
+														  posResource.Get());
 	posResource.Attach(resource);
 
 	//Create Upload Heap for all the transfers
@@ -263,8 +254,6 @@ int main(int, char**)
 	subResources[2].pData	  = positions;
 	subResources[2].RowPitch   = bufferDesc.Width;
 	subResources[2].SlicePitch = subResources[2].RowPitch;
-
-
 
 	//Schedule the Vertex transfer
 	copyList.ScheduleCopy(
@@ -295,8 +284,6 @@ int main(int, char**)
 	gps.SetPixelShader(L"Shaders/CubePS.hlsl");
 	gps.SetVertexShader(L"Shaders/CubeVS.hlsl");
 	gps.Finalize(device.GetDevice(), pRootGraphics.Get());
-
-
 
 	FPSCamera camera;
 	camera.setPosition({0, 5, 0});
@@ -422,9 +409,7 @@ int main(int, char**)
 	TIF(device->CreateDescriptorHeap(&srvUavHeapDesc, IID_PPV_ARGS(&g_Heap)));
 	NAME_D3D12_OBJECT(g_Heap);
 
-	
-
-	
+#if 0
 	//Name the Resources
 	/*NAME_D3D12_OBJECT(boxBuffer.GetBufferResourceComPtr()); 
 	NAME_D3D12_OBJECT(grid.GetVertexBuffer()->GetBufferResourceComPtr());
@@ -453,6 +438,7 @@ int main(int, char**)
 	posBarrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	posBarrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
 	copyList.GetList().Get()->ResourceBarrier(1, &posBarrier);*/
+#endif
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
@@ -484,7 +470,7 @@ int main(int, char**)
 	device->CreateUnorderedAccessView(posResource.Get(), nullptr, &uavDesc, offHeap);
 
 	static float m_timer									   = 0;
-	static float m_timer2									   = 0;
+	static float m_particleGenTimer							   = 0;
 	const double UPDATE_TIME								   = 1.0 / 60.0;
 	static float dt											   = 1 / 60;
 	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
@@ -493,15 +479,16 @@ int main(int, char**)
 
 	D3D12::D3D12Timer computeTimer;
 	computeTimer.init(device.GetDevice(), 1);
-	double timeInMs = 0;
+	D3D12::D3D12Timer renderTimer;
+	renderTimer.init(device.GetDevice(), 1);
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
 		m_timer += dt;
-		m_timer2 += dt;
-		if(m_timer2 > 0.2 && !(cbData.numCubes >= nCubes))
+		m_particleGenTimer += dt;
+		if(m_particleGenTimer > 0.1 && !(cbData.numCubes >= nCubes))
 		{
-			m_timer2 = 0;
+			m_particleGenTimer = 0;
 			cbData.numCubes += 128;
 			cbData.numBlocks = ceil(cbData.numCubes / blockSize);
 		}
@@ -546,7 +533,7 @@ int main(int, char**)
 					camera.rotate(-dx * deltaTime, -dy * deltaTime);
 				}
 
-				float speed = Input::IsKeyPressed(VK_SHIFT) ? 400 : 10;
+				float speed = Input::IsKeyPressed(VK_SHIFT) ? 100 : 10;
 				if(GetAsyncKeyState('W'))
 					camMovement -= camRotMat.r[2] * deltaTime * speed;
 				if(GetAsyncKeyState('S'))
@@ -560,6 +547,7 @@ int main(int, char**)
 				if(GetAsyncKeyState('E'))
 					camMovement += camRotMat.r[1] * deltaTime * speed;
 
+#if 0
 				//if(GetAsyncKeyState('C'))
 				//{
 				//	//Resize the position buffer and its SRV and copy the
@@ -636,6 +624,7 @@ int main(int, char**)
 				//	offHeap.ptr += descSize;
 				//	device->CreateUnorderedAccessView(posbuffer.Get(), nullptr, &uavDesc, offHeap);
 				//}
+#endif
 
 				camera.move(camMovement);
 				camera.update(deltaTime);
@@ -667,11 +656,15 @@ int main(int, char**)
 			pComputeList->SetComputeRootDescriptorTable(0, SrvHandle);
 			pComputeList->SetComputeRootDescriptorTable(1, UavHandle);
 
+			computeTimer.start(pComputeList.Get(), 0);
 			pComputeList->Dispatch(cbData.numBlocks, 1, 1);
 
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			pComputeList->ResourceBarrier(1, &srvToUav);
+
+			computeTimer.stop(pComputeList.Get(), 0);
+			computeTimer.resolveQueryToCPU(pComputeList.Get(), 0);
 
 			TIF(pComputeList->Close());
 			computeQueue.SubmitList(pComputeList.Get());
@@ -701,6 +694,8 @@ int main(int, char**)
 			cl->SetPipelineState(gps.GetPtr());
 			cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
+
+			renderTimer.start(cl.GetPtr(), 0);
 			cl->DrawInstanced(boxBuffer.GetVertexCount(), cbData.numCubes, 0, 0);
 
 			// Draw Grid
@@ -714,6 +709,9 @@ int main(int, char**)
 			ImGui::Render();
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
 
+			renderTimer.stop(cl.GetPtr(), 0);
+			renderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
+
 			cl.Finish();
 
 			CommandQueue.SubmitList(cl.GetPtr());
@@ -723,15 +721,24 @@ int main(int, char**)
 
 			fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
 
-			//get time in ms
+			//get compute time in ms
 			UINT64 queueFreq;
 			computeQueue.GetTimestampFrequency(&queueFreq);
 			double timestampToMs = (1.0 / queueFreq) * 1000.0;
 
-			D3D12::GPUTimestampPair drawTime = computeTimer.getTimestampPair(0);
+			D3D12::GPUTimestampPair computeTime = computeTimer.getTimestampPair(0);
 
-			UINT64 dt = drawTime.Stop - drawTime.Start;
-			timeInMs  = dt * timestampToMs;
+			UINT64 dtQ		= computeTime.Stop - computeTime.Start;
+			computeTimeInMs = dtQ * timestampToMs;
+
+			//get render time in ms
+			CommandQueue.GetTimestampFrequency(&queueFreq);
+			timestampToMs					 = (1.0 / queueFreq) * 1000.0;
+			D3D12::GPUTimestampPair drawTime = renderTimer.getTimestampPair(0);
+			drawTime						 = renderTimer.getTimestampPair(0);
+
+			dtQ	 = drawTime.Stop - drawTime.Start;
+			renderTimeInMs = dtQ * timestampToMs;
 		}
 
 		currentTime = std::chrono::steady_clock::now();
@@ -782,6 +789,10 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
 					1000.0f / ImGui::GetIO().Framerate,
 					ImGui::GetIO().Framerate);
+		ImGui::Text("Compute average %.6f ms/frame", computeTimeInMs);
+		ImGui::Text("Render average %.6f ms/frame", renderTimeInMs);
+		ImGui::Text("C&R average %.1f ms/frame", renderTimeInMs + computeTimeInMs);
+		ImGui::Text("Particle ammount: %.iK", cbData.numCubes/1000);
 		ImGui::End();
 	}
 }

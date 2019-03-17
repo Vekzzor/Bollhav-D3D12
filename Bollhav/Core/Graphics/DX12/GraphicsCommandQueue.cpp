@@ -32,6 +32,11 @@ ID3D12CommandQueue* GraphicsCommandQueue::GetCommandQueue() const
 	return m_pCommandQueue.Get();
 }
 
+void GraphicsCommandQueue::GetTimestampFrequency(UINT64* qFrec) 
+{
+	m_pCommandQueue->GetTimestampFrequency(qFrec);
+}
+
 void GraphicsCommandQueue::WaitForGPU()
 {
 	TIF(m_pCommandQueue->Signal(m_pFence.Get(), m_FenceSignal));

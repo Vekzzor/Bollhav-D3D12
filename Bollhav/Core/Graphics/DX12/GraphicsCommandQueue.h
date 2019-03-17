@@ -8,7 +8,7 @@ public:
 	void SubmitList(ID3D12CommandList* _pCommandList);
 	void Execute();
 	ID3D12CommandQueue* GetCommandQueue() const;
-
+	void GetTimestampFrequency(UINT64* qFrec);
 	void WaitForGPU();
 
 private:
