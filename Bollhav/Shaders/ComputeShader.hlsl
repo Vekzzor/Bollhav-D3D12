@@ -49,7 +49,7 @@ void CS_main(uint3 DTid : SV_DispatchThreadID)
     pos.xyz += vel.xyz * 0.0001f; //deltaTime;
    // pos.xyz += (accel.xyz * 0.001f) / 2.0f;
   
-    outputData[index].pos = pos;
+    outputData[index].pos = srv[index].pos;
     outputData[index].vel = vel;
     
 }

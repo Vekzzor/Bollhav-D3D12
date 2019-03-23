@@ -18,11 +18,10 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDescriptor() const;
 
 private:
-	static const int NUM_BACK_BUFFERS = 3;
 
 	UINT m_FrameIndex;
-	D3D12_CPU_DESCRIPTOR_HANDLE m_RTDescriptor[NUM_BACK_BUFFERS] = {};
-	ComPtr<ID3D12Resource> m_pRenderTarget[NUM_BACK_BUFFERS];
+	D3D12_CPU_DESCRIPTOR_HANDLE m_RTDescriptor[NUM_BACKBUFFERS] = {};
+	ComPtr<ID3D12Resource> m_pRenderTarget[NUM_BACKBUFFERS];
 	ComPtr<ID3D12DescriptorHeap> m_pRTVDescHeap;
 
 	ComPtr<IDXGISwapChain4> m_pSwapchain;

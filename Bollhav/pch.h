@@ -11,7 +11,7 @@ using namespace DirectX;
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-constexpr int NUM_BACKBUFFERS = 3;
+constexpr int NUM_BACKBUFFERS = 2;
 
 #include <pix3.h>
 #include <wrl.h>

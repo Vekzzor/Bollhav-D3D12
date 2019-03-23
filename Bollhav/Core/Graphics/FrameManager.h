@@ -10,10 +10,10 @@ public:
 	void WaitForLastSubmittedFrame();
 	void SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue);
 	ID3D12Fence* GetFencePtr();
+	UINT64 m_fenceLastSignaledValue;
 private:
 	Frame m_Frames[NUM_BACKBUFFERS];
 	UINT m_iFrameIndex;
-	UINT64 m_fenceLastSignaledValue;
 
 	HANDLE m_hFenceEvent;
 	ComPtr<ID3D12Fence> m_pFence;
