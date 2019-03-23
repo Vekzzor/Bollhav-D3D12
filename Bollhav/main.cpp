@@ -22,6 +22,8 @@
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
+void CreateRootGraphics(Device& device, Microsoft::WRL::ComPtr<ID3D12RootSignature>& pRootGraphics);
+void CreateRootCompute(Device& device);
 void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList);
 
 ComPtr<ID3D12DescriptorHeap> g_Heap;
@@ -32,7 +34,8 @@ ComPtr<ID3D12PipelineState> gComputePipeline;
 UINT gDescriptorSize;
 // Buffer containing positions
 ComPtr<ID3D12Resource> gPosbuffer;
-constexpr UINT gNumCubes = 1024;
+constexpr UINT gTotalNumCubes = 128;
+UINT gNumCubesCount			  = 1;
 
 // Thread
 constexpr UINT gThreadCount = 1;
@@ -72,73 +75,12 @@ int main(int, char**)
 	DepthStencil ds(device.GetDevice(), window.GetWidth(), window.GetHeight());
 
 	ComPtr<ID3D12RootSignature> pRootGraphics;
-	{
-		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		if(FAILED(device->CheckFeatureSupport(
-			   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-		{
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-		}
-
-		D3D12_DESCRIPTOR_RANGE1 ranges[1];
-		ranges[0].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		ranges[0].NumDescriptors					= 1;
-		ranges[0].BaseShaderRegister				= 0;
-		ranges[0].RegisterSpace						= 0;
-		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-		ranges[0].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
-
-		D3D12_ROOT_PARAMETER1 rootParameters[3];
-		rootParameters[0].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_CBV;
-		rootParameters[0].ShaderVisibility			= D3D12_SHADER_VISIBILITY_ALL;
-		rootParameters[0].Descriptor.ShaderRegister = 0;
-		rootParameters[0].Descriptor.RegisterSpace  = 0;
-		rootParameters[0].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
-
-		rootParameters[1].ParameterType			   = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		rootParameters[1].ShaderVisibility		   = D3D12_SHADER_VISIBILITY_ALL;
-		rootParameters[1].Constants.Num32BitValues = 16;
-		rootParameters[1].Constants.ShaderRegister = 1;
-		rootParameters[1].Constants.RegisterSpace  = 0;
-
-		rootParameters[2].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_SRV;
-		rootParameters[2].ShaderVisibility			= D3D12_SHADER_VISIBILITY_VERTEX;
-		rootParameters[2].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
-		rootParameters[2].Descriptor.RegisterSpace  = 0;
-		rootParameters[2].Descriptor.ShaderRegister = 0;
-
-		D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-		samplerDesc.Filter					  = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-		samplerDesc.AddressU				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressV				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-		samplerDesc.AddressW				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
-		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
-		rootSig.Desc_1_1.pParameters	   = rootParameters;
-		rootSig.Desc_1_1.NumStaticSamplers = 1;
-		rootSig.Desc_1_1.pStaticSamplers   = &samplerDesc;
-		rootSig.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-
-		TIF(D3DX12SerializeVersionedRootSignature(
-			&rootSig, featureData.HighestVersion, &signature, &error));
-		TIF(device->CreateRootSignature(0,
-										signature->GetBufferPointer(),
-										signature->GetBufferSize(),
-										IID_PPV_ARGS(&pRootGraphics)));
-
-		NAME_D3D12_OBJECT(pRootGraphics);
-	}
+	CreateRootGraphics(device, pRootGraphics);
 
 	FrameManager fm(device.GetDevice());
 	CommandList cl(device.GetDevice(), fm.GetReadyFrame(&sc)->GetDirectAllocator());
 
-	CopyList copyList = CopyList(device.GetDevice());
+	CopyList copyList(device.GetDevice());
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
 
@@ -188,65 +130,7 @@ int main(int, char**)
 	scissor.top	= 0;
 	scissor.bottom = vp.Height;
 
-	{
-		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-		featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		if(FAILED(device->CheckFeatureSupport(
-			   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-		{
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-		}
-
-		D3D12_DESCRIPTOR_RANGE1 ranges[2];
-		ranges[0].RangeType			 = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		ranges[0].NumDescriptors	 = 1;
-		ranges[0].BaseShaderRegister = 0;
-		ranges[0].RegisterSpace		 = 0;
-		ranges[0].Flags				 = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
-		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		ranges[1].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-		ranges[1].NumDescriptors					= 1;
-		ranges[1].BaseShaderRegister				= 0;
-		ranges[1].RegisterSpace						= 0;
-		ranges[1].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-		ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-		D3D12_ROOT_PARAMETER1 rootParameters[2];
-		rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-		rootParameters[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
-		rootParameters[0].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
-
-		rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-		rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
-		rootParameters[1].DescriptorTable.pDescriptorRanges   = &ranges[1];
-		rootParameters[1].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
-
-		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
-		rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
-		rootSig.Desc_1_1.pParameters	   = rootParameters;
-		rootSig.Desc_1_1.NumStaticSamplers = 0;
-		rootSig.Desc_1_1.pStaticSamplers   = nullptr;
-		rootSig.Desc_1_1.Flags			   = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-		ComPtr<ID3DBlob> signature;
-		ComPtr<ID3DBlob> error;
-
-		TIF(D3DX12SerializeVersionedRootSignature(
-			&rootSig, featureData.HighestVersion, &signature, &error));
-		if(error)
-		{
-			std::cout << (char*)error->GetBufferPointer() << std::endl;
-		}
-		TIF(device->CreateRootSignature(0,
-										signature->GetBufferPointer(),
-										signature->GetBufferSize(),
-										IID_PPV_ARGS(&gRootCompute)));
-
-		NAME_D3D12_OBJECT(gRootCompute);
-	}
+	CreateRootCompute(device);
 
 	ComPtr<ID3DBlob> computeBlob;
 	TIF(D3DCompileFromFile(L"Shaders/ComputeShader.hlsl",
@@ -291,17 +175,17 @@ int main(int, char**)
 		float vx, vy, vz; // Velocity
 	};
 
-	DATA positions[gNumCubes];
-	for(int i = 0; i < gNumCubes; i++)
+	DATA positions[gTotalNumCubes];
+	for(int i = 0; i < gTotalNumCubes; i++)
 	{
 		float rand_y = rand() / RAND_MAX;
 		float rand_x = rand() / RAND_MAX;
 
 		float ii	   = static_cast<float>(i);
-		positions[i].x = (rand() % 10) - 5;
+		positions[i].x = -ii;
 
-		positions[i].y = (rand() % 10) - 5;
-		positions[i].z = (rand() % 10) - 5;
+		positions[i].y = 0;
+		positions[i].z = 0;
 
 		positions[i].vx = rand_y * 0.001f;
 		positions[i].vy = -rand_x * 0.001f;
@@ -322,7 +206,7 @@ int main(int, char**)
 	bufferDesc.Flags			   = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 	bufferDesc.Format			   = DXGI_FORMAT_UNKNOWN;
 	bufferDesc.Height			   = 1;
-	bufferDesc.Width			   = sizeof(positions);
+	bufferDesc.Width			   = sizeof(positions); // Creates a fullsize buffer
 	bufferDesc.Layout			   = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	bufferDesc.MipLevels		   = 1;
 	bufferDesc.SampleDesc.Count	= 1;
@@ -359,7 +243,7 @@ int main(int, char**)
 
 	//Position Transfer Data
 	subResources[2].pData	  = positions;
-	subResources[2].RowPitch   = bufferDesc.Width;
+	subResources[2].RowPitch   = gNumCubesCount * sizeof(DATA);
 	subResources[2].SlicePitch = subResources[2].RowPitch;
 
 	//Schedule the Vertex transfer
@@ -373,13 +257,32 @@ int main(int, char**)
 						  vertexSize);
 
 	//Schedule the Position transfer.
-	copyList.ScheduleCopy(
-		gPosbuffer.Get(), copyList.GetUploadHeap().Get(), subResources[2], (vertexSize + gridSize));
+
+	// Get the placed subresource footprint
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts;
+	UINT nRows;
+	UINT64 rowSizeBytes;
+	UINT64 requiredSize = 0;
+	device->GetCopyableFootprints(
+		&bufferDesc, 0, 1, vertexSize + gridSize, &layouts, &nRows, &rowSizeBytes, &requiredSize);
+	UINT dataSize = sizeof(DATA);
+	// Copy the data to the resoruce
+	{
+		BYTE* pData;
+		copyList.GetUploadHeap()->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData));
+		// Offset the pointer
+		pData += layouts.Offset;
+		memcpy(pData, positions, dataSize);
+		copyList.GetUploadHeap()->Unmap(0, nullptr);
+	}
+
+	copyList->CopyBufferRegion(
+		gPosbuffer.Get(), 0, copyList.GetUploadHeap().Get(), layouts.Offset, dataSize);
+
+	copyList.GetList().Get()->Close();
 
 	//Submit and execute
 	copyCommandQueue.SubmitList(copyList.GetList().Get());
-
-	copyList.GetList().Get()->Close();
 
 	copyCommandQueue.Execute();
 	copyCommandQueue.WaitForGPU();
@@ -390,7 +293,7 @@ int main(int, char**)
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Buffer.FirstElement				= 0;
-	srvDesc.Buffer.NumElements				= ARRAYSIZE(positions);
+	srvDesc.Buffer.NumElements				= gTotalNumCubes;
 	srvDesc.Buffer.StructureByteStride		= sizeof(DATA);
 	srvDesc.Buffer.Flags					= D3D12_BUFFER_SRV_FLAG_NONE;
 	srvDesc.Shader4ComponentMapping			= D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -404,7 +307,7 @@ int main(int, char**)
 	uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
 	uavDesc.ViewDimension					 = D3D12_UAV_DIMENSION_BUFFER;
 	uavDesc.Buffer.FirstElement				 = 0;
-	uavDesc.Buffer.NumElements				 = ARRAYSIZE(positions);
+	uavDesc.Buffer.NumElements				 = gTotalNumCubes;
 	uavDesc.Buffer.StructureByteStride		 = sizeof(DATA);
 	uavDesc.Buffer.CounterOffsetInBytes		 = 0;
 	uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
@@ -478,16 +381,18 @@ int main(int, char**)
 			camera.update(deltaTime);
 		}
 
+		
+
 		Frame* frameCtxt = fm.GetReadyFrame(&sc);
 
 		// Before we can render we need to instruct the compute thread to start its queues
 		for(UINT threadID = 0; threadID < gThreadCount; threadID++)
 		{
 			// This makes the threads pass Wait point 1
-			// We need to pass the actuall fence value
+			// We need to pass the actual fence value
 			UINT64 val = frameCtxt->GetFenceValue();
-			
-			InterlockedExchange(&gTRenderFenceValue[threadID],val);
+
+			InterlockedExchange(&gTRenderFenceValue[threadID], val);
 		}
 
 		// Now lets wait for the compute to finish
@@ -498,7 +403,6 @@ int main(int, char**)
 			{
 				// Instruct the queue to wait for the current compute work to finish
 				CommandQueue->Wait(gTComputeFence[threadID].Get(), fenceVal);
-				std::cout << fenceVal << '\n';
 			}
 		}
 
@@ -527,7 +431,7 @@ int main(int, char**)
 		cl->SetPipelineState(gps.GetPtr());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
-		cl->DrawInstanced(boxBuffer.GetVertexCount(), ARRAYSIZE(positions), 0, 0);
+		cl->DrawInstanced(boxBuffer.GetVertexCount(), gNumCubesCount, 0, 0);
 
 		// Draw Grid
 		grid.Draw(cl.GetPtr());
@@ -548,6 +452,67 @@ int main(int, char**)
 		sc.Present();
 
 		fm.SyncCommandQueue(frameCtxt, CommandQueue.GetCommandQueue());
+
+		// Lets start with a copy
+		if(Input::IsKeyTyped(VK_RETURN))
+		{
+
+			copyList.ResetCopyAllocator();
+			copyList.ResetCopyList();
+
+			D3D12_RESOURCE_BARRIER barrier;
+			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource   = gPosbuffer.Get();
+			barrier.Transition.Subresource = 0;
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
+
+			//copyList->ResourceBarrier(1, &barrier);
+			// Get the placed subresource footprint
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts;
+			UINT nRows;
+			UINT64 rowSizeBytes;
+			UINT64 requiredSize = 0;
+			device->GetCopyableFootprints(&bufferDesc,
+										  0,
+										  1,
+										  vertexSize + gridSize,
+										  &layouts,
+										  &nRows,
+										  &rowSizeBytes,
+										  &requiredSize);
+			// We only want to upload one cube
+			UINT dataSize   = sizeof(DATA);
+			UINT64 cubeOffset  = (gNumCubesCount * dataSize);
+			UINT DataOffset = layouts.Offset + cubeOffset;
+			// Copy the data to the resoruce
+			{
+				BYTE* pData;
+				TIF(copyList.GetUploadHeap()->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+				// Offset the pointer
+				pData += DataOffset; // Offset one in the original dataset
+				BYTE* posWithOffset = reinterpret_cast<BYTE*>(&positions) + cubeOffset;
+				memcpy(pData, posWithOffset, dataSize);
+				copyList.GetUploadHeap()->Unmap(0, nullptr);
+			}
+
+			copyList->CopyBufferRegion(
+				gPosbuffer.Get(), cubeOffset, copyList.GetUploadHeap().Get(), DataOffset, dataSize);
+
+			std::swap(barrier.Transition.StateAfter, barrier.Transition.StateBefore);
+			//copyList->ResourceBarrier(1, &barrier);
+
+			copyList.GetList().Get()->Close();
+
+			//Submit and execute
+			copyCommandQueue.SubmitList(copyList.GetList().Get());
+
+			copyCommandQueue.Execute();
+			copyCommandQueue.WaitForGPU();
+			gNumCubesCount++;
+			std::cout << gNumCubesCount << std::endl;
+		}
 	}
 	fm.WaitForLastSubmittedFrame();
 	ImGui_ImplDX12_Shutdown();
@@ -555,6 +520,129 @@ int main(int, char**)
 	ImGui::DestroyContext();
 
 	return 0;
+}
+
+void CreateRootCompute(Device& device)
+{
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+	featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	if(FAILED(device->CheckFeatureSupport(
+		   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	{
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	}
+
+	D3D12_DESCRIPTOR_RANGE1 ranges[2];
+	ranges[0].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	ranges[0].NumDescriptors					= 1;
+	ranges[0].BaseShaderRegister				= 0;
+	ranges[0].RegisterSpace						= 0;
+	ranges[0].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE;
+	ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	ranges[1].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	ranges[1].NumDescriptors					= 1;
+	ranges[1].BaseShaderRegister				= 0;
+	ranges[1].RegisterSpace						= 0;
+	ranges[1].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+	ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER1 rootParameters[2];
+	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[0].DescriptorTable.pDescriptorRanges   = &ranges[0];
+	rootParameters[0].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
+
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParameters[1].DescriptorTable.pDescriptorRanges   = &ranges[1];
+	rootParameters[1].ShaderVisibility					  = D3D12_SHADER_VISIBILITY_ALL;
+
+	D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
+	rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
+	rootSig.Desc_1_1.pParameters	   = rootParameters;
+	rootSig.Desc_1_1.NumStaticSamplers = 0;
+	rootSig.Desc_1_1.pStaticSamplers   = nullptr;
+	rootSig.Desc_1_1.Flags			   = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+
+	TIF(D3DX12SerializeVersionedRootSignature(
+		&rootSig, featureData.HighestVersion, &signature, &error));
+	if(error)
+	{
+		std::cout << (char*)error->GetBufferPointer() << std::endl;
+	}
+	TIF(device->CreateRootSignature(
+		0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&gRootCompute)));
+
+	NAME_D3D12_OBJECT(gRootCompute);
+}
+
+void CreateRootGraphics(Device& device, Microsoft::WRL::ComPtr<ID3D12RootSignature>& pRootGraphics)
+{
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+	featureData.HighestVersion					  = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	if(FAILED(device->CheckFeatureSupport(
+		   D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+	{
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+	}
+
+	D3D12_DESCRIPTOR_RANGE1 ranges[1];
+	ranges[0].RangeType							= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	ranges[0].NumDescriptors					= 1;
+	ranges[0].BaseShaderRegister				= 0;
+	ranges[0].RegisterSpace						= 0;
+	ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	ranges[0].Flags								= D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC;
+
+	D3D12_ROOT_PARAMETER1 rootParameters[3];
+	rootParameters[0].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[0].ShaderVisibility			= D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[0].Descriptor.ShaderRegister = 0;
+	rootParameters[0].Descriptor.RegisterSpace  = 0;
+	rootParameters[0].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC;
+
+	rootParameters[1].ParameterType			   = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParameters[1].ShaderVisibility		   = D3D12_SHADER_VISIBILITY_ALL;
+	rootParameters[1].Constants.Num32BitValues = 16;
+	rootParameters[1].Constants.ShaderRegister = 1;
+	rootParameters[1].Constants.RegisterSpace  = 0;
+
+	rootParameters[2].ParameterType				= D3D12_ROOT_PARAMETER_TYPE_SRV;
+	rootParameters[2].ShaderVisibility			= D3D12_SHADER_VISIBILITY_VERTEX;
+	rootParameters[2].Descriptor.Flags			= D3D12_ROOT_DESCRIPTOR_FLAG_NONE;
+	rootParameters[2].Descriptor.RegisterSpace  = 0;
+	rootParameters[2].Descriptor.ShaderRegister = 0;
+
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter					  = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.AddressU				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressV				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressW				  = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+
+	D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSig;
+	rootSig.Version					   = D3D_ROOT_SIGNATURE_VERSION_1_1;
+	rootSig.Desc_1_1.NumParameters	 = _countof(rootParameters);
+	rootSig.Desc_1_1.pParameters	   = rootParameters;
+	rootSig.Desc_1_1.NumStaticSamplers = 1;
+	rootSig.Desc_1_1.pStaticSamplers   = &samplerDesc;
+	rootSig.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+
+	TIF(D3DX12SerializeVersionedRootSignature(
+		&rootSig, featureData.HighestVersion, &signature, &error));
+	TIF(device->CreateRootSignature(0,
+									signature->GetBufferPointer(),
+									signature->GetBufferSize(),
+									IID_PPV_ARGS(&pRootGraphics)));
+
+	NAME_D3D12_OBJECT(pRootGraphics);
 }
 
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle)
@@ -667,14 +755,14 @@ DWORD WINAPI ThreadProc(LPVOID _pThreadData)
 		pComputeList->SetComputeRootDescriptorTable(0, SrvHandle);
 		pComputeList->SetComputeRootDescriptorTable(1, UavHandle);
 
-		pComputeList->Dispatch(gNumCubes, 1, 1);
+		pComputeList->Dispatch(gNumCubesCount, 1, 1);
 
 		srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		pComputeList->ResourceBarrier(1, &srvToUav);
 
 		TIF(pComputeList->Close());
-		
+
 		// Execute
 		ID3D12CommandList* Lists[] = {pComputeList};
 		pComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
