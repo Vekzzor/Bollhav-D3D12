@@ -82,6 +82,7 @@ HRESULT CopyList::CreateUploadHeap(ID3D12Device4* pDevice, UINT dataSize)
 											   D3D12_RESOURCE_STATE_GENERIC_READ,
 											   nullptr,
 											   IID_PPV_ARGS(&m_pUploadHeapResource)));
+	NAME_D3D12_OBJECT(m_pUploadHeapResource);
 
 	return hrU;
 }
