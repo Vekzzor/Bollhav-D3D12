@@ -6,7 +6,7 @@ FrameManager::FrameManager(ID3D12Device4* _pDevice)
 {
 	for(int i = 0; i < NUM_BACKBUFFERS; i++)
 		m_Frames[i] = Frame(_pDevice);
-	TIF(_pDevice->CreateFence(m_iFrameIndex, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
+	TIF(_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
 	m_hFenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
 
