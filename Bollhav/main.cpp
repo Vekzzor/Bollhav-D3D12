@@ -421,15 +421,6 @@ int main(int, char**)
 		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
 		cl->DrawInstanced(boxBuffer.GetVertexCount(), gNumCubesCount[0], 0, 0);
 
-		D3D12_RESOURCE_BARRIER barrier;
-		barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Transition.pResource   = gTPosBuffer[frameIndex].Get();
-		barrier.Transition.Subresource = 0;
-		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-		barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-		cl->ResourceBarrier(1, &barrier);
 		// Draw Grid
 		//grid.Draw(cl.GetPtr());
 
@@ -913,6 +904,15 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			TIF(pComputeAllocator->Reset());
 			TIF(pComputeList->Reset(pComputeAllocator, gComputePipeline.Get()));
 
+			D3D12_RESOURCE_BARRIER srvToUav = {};
+			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
+			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+			pComputeList->ResourceBarrier(1, &srvToUav);
+
 			pComputeList->SetComputeRootSignature(gRootCompute.Get());
 			ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
 			pComputeList->SetDescriptorHeaps(_countof(ppHeaps2), ppHeaps2);
@@ -930,13 +930,8 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			pComputeList->Dispatch(
 				InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0), 1, 1);
 
-			D3D12_RESOURCE_BARRIER srvToUav = {};
-			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
 			pComputeList->ResourceBarrier(1, &srvToUav);
 
 			TIF(pComputeList->Close());
