@@ -425,8 +425,8 @@ int main(int, char**)
 		barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		barrier.Transition.pResource   = gTPosBuffer[frameIndex].Get();
 		barrier.Transition.Subresource = 0;
-		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
 		cl->ResourceBarrier(1, &barrier);
@@ -865,6 +865,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 										IID_PPV_ARGS(&gTComputeList));
 
 			NAME_D3D12_OBJECT(gTComputeList);
+			gTComputeList->Close();
 
 			// NOTE(Henrik): Check on the shared flag
 			gTComputeFenceValue[0] = 0;
@@ -907,15 +908,10 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 		SafePrint("Compute[%i]:\tStart\n", backbufferIndex);
 
-		// Run the compute shader
+		// Fill compute list
 		{
-			D3D12_RESOURCE_BARRIER srvToUav = {};
-			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
-			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			pComputeList->ResourceBarrier(1, &srvToUav);
+			TIF(pComputeAllocator->Reset());
+			TIF(pComputeList->Reset(pComputeAllocator, gComputePipeline.Get()));
 
 			pComputeList->SetComputeRootSignature(gRootCompute.Get());
 			ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
@@ -934,8 +930,13 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			pComputeList->Dispatch(
 				InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0), 1, 1);
 
+			D3D12_RESOURCE_BARRIER srvToUav = {};
+			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
 			pComputeList->ResourceBarrier(1, &srvToUav);
 
 			TIF(pComputeList->Close());
@@ -946,14 +947,17 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 		pComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
 
 		// Wait for the compute to finish.
-		UINT64 threadFenceValue = InterlockedIncrement(&gTComputeFenceValue[backbufferIndex]);
-		TIF(pComputeQueue->Signal(gTComputeFence[backbufferIndex].Get(), threadFenceValue));
+		{
+			UINT64 threadFenceValue = InterlockedIncrement(&gTComputeFenceValue[backbufferIndex]);
+			TIF(pComputeQueue->Signal(gTComputeFence[backbufferIndex].Get(), threadFenceValue));
 
-		TIF(gTComputeFence[backbufferIndex]->SetEventOnCompletion(
-			threadFenceValue,
-												 gTEvent[COMPUTE][backbufferIndex]));
-		WaitForSingleObject(gTEvent[COMPUTE][backbufferIndex], INFINITE);
+			TIF(gTComputeFence[backbufferIndex]->SetEventOnCompletion(
+				threadFenceValue, gTEvent[COMPUTE][backbufferIndex]));
 
+			WaitForSingleObject(gTEvent[COMPUTE][backbufferIndex], INFINITE);
+		}
+
+		//Wait if raster has not finished
 		UINT64 fenceVal  = InterlockedCompareExchange(&gTRenderFenceValue[backbufferIndex], 0, 0);
 		UINT64 actualVal = gTRenderFence[backbufferIndex]->GetCompletedValue();
 		if(actualVal < fenceVal)
@@ -969,8 +973,6 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 		PIXEndEvent(pComputeQueue);
 
-		TIF(pComputeAllocator->Reset());
-		TIF(pComputeList->Reset(pComputeAllocator, gComputePipeline.Get()));
 
 		backbufferIndex++;
 		backbufferIndex %= gThreadPerBackBuffer;
@@ -1155,3 +1157,5 @@ void CreateParticleFormation(ParticleFormation formation,
 		break;
 	}
 }
+
+//void waitForQueue(ID3D12Fence* fence, )
