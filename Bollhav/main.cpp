@@ -68,7 +68,7 @@ constexpr UINT gThreadCount			= 1;
 constexpr UINT gThreadPerBackBuffer = 2;
 // Buffer containing positions
 constexpr UINT blockSize	  = 128;
-constexpr UINT gTotalNumCubes = blockSize * blockSize;
+constexpr UINT gTotalNumCubes = blockSize * blockSize * 5;
 volatile ULONG gNumCubesCount[gThreadPerBackBuffer];
 
 struct DATA
@@ -139,7 +139,7 @@ ComPtr<ID3D12GraphicsCommandList> gTCopyList[gThreadPerBackBuffer];
 
 D3D12_PLACED_SUBRESOURCE_FOOTPRINT gTLayouts;
 ComPtr<ID3D12Resource> gTCopyUpload[gThreadPerBackBuffer];
-ComPtr<ID3D12Resource> gTPosBuffer[gThreadPerBackBuffer];
+ComPtr<ID3D12Resource> gTPosBuffer;
 
 ComPtr<ID3D12Fence> gTCopyFence[gThreadPerBackBuffer];
 volatile UINT64 gTCopyFenceValue[gThreadPerBackBuffer];
@@ -379,7 +379,7 @@ int main(int, char**)
 
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
 
-		SafePrint("Frame[%i]:\tStart\n", frameIndex);
+		
 		// Rendering
 		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
 
@@ -391,7 +391,7 @@ int main(int, char**)
 		{
 			// Instruct the queue to wait for the current compute work to finish
 			CommandQueue->Wait(gTComputeFence[frameIndex].Get(), fenceVal);
-			SafePrint("Frame[%i]:\tWaiting ComputeFence(%u:%u)\n", frameIndex, fenceVal, actualVal);
+			
 			//InterlockedExchange(&gTComputeFenceValue[frameIndex], 0);
 		}
 
@@ -410,7 +410,7 @@ int main(int, char**)
 		cl->SetGraphicsRoot32BitConstants(
 			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
 
-		cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer[frameIndex]->GetGPUVirtualAddress());
+		cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer->GetGPUVirtualAddress());
 
 		cl->RSSetViewports(1, &vp);
 		cl->RSSetScissorRects(1, &scissor);
@@ -443,7 +443,7 @@ int main(int, char**)
 		fm.SyncCommandQueue(currentFrame, CommandQueue.GetCommandQueue());
 		currentFrame = fm.GetReadyFrame(&sc);
 		InterlockedIncrement(&gTRenderFenceValue[frameIndex]);
-		SafePrint("Frame[%i]:\tDone\n\n", frameIndex);
+	
 
 		/*std::cout << "Render[" << frameIndex << "]"
 				  << " Done " << std::endl;*/
@@ -717,8 +717,8 @@ void CreateThreads(ID3D12Device* _pDevice)
 												  &bufferDesc,
 												  D3D12_RESOURCE_STATE_COMMON,
 												  nullptr,
-												  IID_PPV_ARGS(&gTPosBuffer[frameIndex])));
-			NAME_D3D12_OBJECT_INDEXED(gTPosBuffer, frameIndex);
+												  IID_PPV_ARGS(&gTPosBuffer)));
+			//NAME_D3D12_OBJECT_INDEXED(gTPosBuffer, frameIndex);
 
 			D3D12_CPU_DESCRIPTOR_HANDLE heapPointer = g_Heap->GetCPUDescriptorHandleForHeapStart();
 			heapPointer.ptr += frameIndex * gDescriptorSize;
@@ -733,7 +733,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 			srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
 			_pDevice->CreateShaderResourceView(
-				gTPosBuffer[frameIndex].Get(), &srvDesc, heapPointer);
+				gTPosBuffer.Get(), &srvDesc, heapPointer);
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
@@ -746,7 +746,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			heapPointer.ptr += gDescriptorSize;
 			_pDevice->CreateUnorderedAccessView(
-				gTPosBuffer[frameIndex].Get(), nullptr, &uavDesc, heapPointer);
+				gTPosBuffer.Get(), nullptr, &uavDesc, heapPointer);
 
 			// Get the layouts
 			UINT nRows;
@@ -756,6 +756,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 				&bufferDesc, 0, 1, 0, &gTLayouts, &nRows, &rowSizeBytes, &requiredSize);
 
 			gTEvent[COPY][frameIndex] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+			break;
 		}
 
 		/*	gThreadIndexes[COPY] = 0;
@@ -777,7 +778,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 			ID3D12Fence* pCopyFence				   = gTCopyFence[backbufferIndex].Get();
 
 			PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
-			SafePrint("Copy[%i]:\tStart\n", backbufferIndex);
+		
 
 			// Do the copying!
 			UINT dataSizeInBytes = sizeof(gPositions);
@@ -796,7 +797,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
-			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
+			pCopyList->CopyBufferRegion(gTPosBuffer.Get(),
 										inArrayOffset,
 										gTCopyUpload[backbufferIndex].Get(),
 										GPUBufferOffset,
@@ -804,7 +805,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			D3D12_RESOURCE_BARRIER barrier = {};
 			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
+			barrier.Transition.pResource   = gTPosBuffer.Get();
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -824,12 +825,13 @@ void CreateThreads(ID3D12Device* _pDevice)
 			TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
 			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
 
-			SafePrint("Copy[%i]:\tDone\n", backbufferIndex);
+		
 
 			PIXEndEvent(pCopyQueue);
 
 			TIF(pCopyAllocator->Reset());
 			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
+			break;
 		}
 	}
 
@@ -897,7 +899,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 		PIXBeginEvent(pComputeQueue, 0, L"Compute");
 
-		SafePrint("Compute[%i]:\tStart\n", backbufferIndex);
+
 
 		// Fill compute list
 		{
@@ -906,7 +908,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			D3D12_RESOURCE_BARRIER srvToUav = {};
 			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
+			srvToUav.Transition.pResource   = gTPosBuffer.Get();
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -960,11 +962,9 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			TIF(pComputeQueue->Wait(gTRenderFence[backbufferIndex].Get(), fenceVal));
 
-			SafePrint(
-				"Compute[%i]:\tWaiting RenderFence(%u:%u)\n", backbufferIndex, fenceVal, actualVal);
 		}
 
-		SafePrint("Compute[%i]:\tDone\n", backbufferIndex);
+	
 
 		PIXEndEvent(pComputeQueue);
 
@@ -990,7 +990,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		ID3D12Fence* pCopyFence				   = gTCopyFence[backbufferIndex].Get();
 
 		PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
-		SafePrint("Copy[%i]:\tStart\n", backbufferIndex);
+		
 
 		// Now we need to wait for the directQueue to finish
 		UINT64 renderContextFenceValue =
@@ -1009,10 +1009,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 																 gTEvent[COPY][backbufferIndex]);
 
 			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);*/
-			SafePrint("Copy[%i]:\tWaiting RenderFence(%u:%u)\n",
-					  backbufferIndex,
-					  renderContextFenceValue,
-					  actualVal);
+		
 		}
 
 		//InterlockedExchange(&gTRenderFenceValue[backbufferIndex], 0);
@@ -1036,7 +1033,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 		gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
-		pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
+		pCopyList->CopyBufferRegion(gTPosBuffer.Get(),
 									inArrayOffset,
 									gTCopyUpload[backbufferIndex].Get(),
 									GPUBufferOffset,
@@ -1044,7 +1041,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 		D3D12_RESOURCE_BARRIER barrier = {};
 		barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrier.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
+		barrier.Transition.pResource   = gTPosBuffer.Get();
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 		barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -1064,8 +1061,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
 		WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
 
-		SafePrint("Copy[%i]:\tDone\n", backbufferIndex);
-
+	
 		/*	InterlockedIncrement(&gNumCubesCount[backbufferIndex]);
 		gNumCubesCount[backbufferIndex] = (gNumCubesCount[backbufferIndex] > (gTotalNumCubes - 1))
 											  ? 1
