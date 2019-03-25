@@ -64,11 +64,31 @@ enum ParticleFormation
 	Something
 };
 
+struct PerformanceData
+{
+	UINT particleCount		= 0;
+	double currentTime		= 0;
+	double FrameTime		= 0;
+	double DispatchDuration = 0;
+	double DrawDuration		= 0;
+} perfData[1000]{};
+
+UINT perfDataIndex					= 0;
+UINT particleAmount					= 0;
+float m_time						= 0;
+static double computeTimeInMs		= 0;
+static double renderTimeInMs		= 0;
+static double totalFrameTimeInMs	= 0;
+static float vRam					= 0;
+
+D3D12::D3D12Timer gComputeTimer;
+D3D12::D3D12Timer gRenderTimer;
+
 constexpr UINT gThreadCount			= 1;
 constexpr UINT gThreadPerBackBuffer = 2;
 // Buffer containing positions
 constexpr UINT blockSize	  = 128;
-constexpr UINT gTotalNumCubes = blockSize * blockSize * 5;
+constexpr UINT gTotalNumCubes = blockSize * blockSize * 7;
 volatile ULONG gNumCubesCount[gThreadPerBackBuffer];
 
 struct DATA
@@ -82,7 +102,8 @@ void CreateParticleFormation(ParticleFormation formation,
 							 DATA particles[gTotalNumCubes],
 							 const UINT& numCubes,
 							 const UINT& blockSize);
-
+float VRamUsage();
+void WriteToFile();
 ComPtr<ID3D12DescriptorHeap> g_Heap;
 
 ComPtr<ID3D12RootSignature> gRootCompute;
@@ -102,7 +123,7 @@ struct CBData
 	UINT numCubes  = 128;
 	UINT numBlocks = 1;
 
-	float dt		 = 0.001f;
+	float dt		 = 0.001f*0.1;
 	float damping	= 1.0f;
 	float centerMass = 10000.0f * 10000.0f;
 } cbData{};
@@ -158,6 +179,9 @@ int main(int, char**)
 	Window window(VideoMode(1280, 720), L"Hejsan");
 
 	Device device;
+	//Init Timers to collect timestamps from GPU
+	gComputeTimer.init(device.GetDevice(), 1);
+	gRenderTimer.init(device.GetDevice(), 1);
 
 	Swapchain sc(device.GetDevice());
 	GraphicsCommandQueue CommandQueue(device.GetDevice(), D3D12_COMMAND_LIST_TYPE_DIRECT);
@@ -315,13 +339,27 @@ int main(int, char**)
 
 	//fm.SyncCommandQueue(currentFrame, CommandQueue.GetCommandQueue());
 
+
+	static float m_timer									   = 0;
+	static float m_particleGenTimer							   = 0;
+	const double UPDATE_TIME								   = 1.0 / 60.0;
+	static float dt											   = 1 / 60;
+	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
+	std::chrono::time_point<std::chrono::steady_clock> currentTime =
+		std::chrono::steady_clock::now();
+
+
+	vRam							 = VRamUsage();
+	bool particlesIncreased			 = false;
+	constexpr float particleInterval = 0.01;
+	UINT lastFrameIndexHit			 = 0;
 	CreateThreads(device.GetDevice());
 	/*currentFrame = fm.GetReadyFrame(&sc);
 	fm.m_iFrameIndex = 0;*/
 	cl->Close();
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
-
+		
 		window.pollEvents();
 
 		// Start the Dear ImGui frame
@@ -378,7 +416,23 @@ int main(int, char**)
 		}
 
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
-
+		
+		m_particleGenTimer += dt;
+		if(particlesIncreased && frameIndex != lastFrameIndexHit)
+		{
+			gNumCubesCount[frameIndex] += 128;
+			particlesIncreased = false;
+		}
+		else if(gNumCubesCount[frameIndex] < gTotalNumCubes)
+		{
+			m_time += m_particleGenTimer;
+			lastFrameIndexHit = frameIndex;
+			particleAmount = gNumCubesCount[frameIndex] += 128;
+			//cbData.numBlocks = ceil(gNumCubesCount[frameIndex] / 128);
+			cbData.numCubes = particleAmount;
+			m_particleGenTimer -= particleInterval;
+			particlesIncreased = true;
+		}
 		
 		// Rendering
 		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
@@ -419,6 +473,8 @@ int main(int, char**)
 		cl->SetPipelineState(gps.GetPtr());
 		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
+
+		gRenderTimer.start(cl.GetPtr(), 0);
 		cl->DrawInstanced(boxBuffer.GetVertexCount(), gNumCubesCount[0], 0, 0);
 
 		// Draw Grid
@@ -431,6 +487,9 @@ int main(int, char**)
 
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
+		
+		gRenderTimer.stop(cl.GetPtr(), 0);
+		gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
 
 		cl.Finish();
 
@@ -445,6 +504,33 @@ int main(int, char**)
 		InterlockedIncrement(&gTRenderFenceValue[frameIndex]);
 	
 
+		UINT64 queueFreq = 0;
+		double timestampToMs = (1.0 / queueFreq) * 1000.0;
+
+		//get render time in ms
+		CommandQueue.GetTimestampFrequency(&queueFreq);
+		timestampToMs					 = (1.0 / queueFreq) * 1000.0;
+		D3D12::GPUTimestampPair drawTime = gRenderTimer.getTimestampPair(0);
+		drawTime						 = gRenderTimer.getTimestampPair(0);
+
+		UINT64 dtQ  = drawTime.Stop - drawTime.Start;
+		renderTimeInMs = dtQ * timestampToMs;
+
+
+		currentTime = std::chrono::steady_clock::now();
+		dt = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTime - preTime).count() /
+			 1000000000.0f;
+		preTime = currentTime;
+		if(particlesIncreased)
+		{
+			perfData[perfDataIndex].currentTime		 = m_time;
+			perfData[perfDataIndex].particleCount	= cbData.numCubes;
+			perfData[perfDataIndex].DrawDuration	 = renderTimeInMs;
+			//perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
+			perfData[perfDataIndex].FrameTime		 = 1000.0f / ImGui::GetIO().Framerate;
+			perfDataIndex++;
+		}
+
 		/*std::cout << "Render[" << frameIndex << "]"
 				  << " Done " << std::endl;*/
 	}
@@ -454,6 +540,7 @@ int main(int, char**)
 	WaitForSingleObject(gThreadHandles[COPY], INFINITE);
 
 	fm.WaitForLastSubmittedFrame();
+	WriteToFile();
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
@@ -610,7 +697,6 @@ void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle)
 
 void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 {
-
 	{
 
 		ImGui::Begin("FPS"); // Create a window called "Hello, world!" and append into it.
@@ -618,6 +704,12 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
 					1000.0f / ImGui::GetIO().Framerate,
 					ImGui::GetIO().Framerate);
+		ImGui::Text("Compute average %.6f ms/frame", computeTimeInMs);
+		ImGui::Text("Render average %.6f ms/frame", renderTimeInMs);
+		ImGui::Text("C&R average %.1f ms/frame", renderTimeInMs + computeTimeInMs);
+		ImGui::Text("Particle ammount: %.iK", particleAmount / 1000);
+		ImGui::Text("VRAM Usage: %.0fMB", vRam);
+		ImGui::Text("Time: %.1fs", m_time);
 		ImGui::End();
 	}
 }
@@ -627,7 +719,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 	gDescriptorSize =
 		_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	for(unsigned j = 0; j < gThreadPerBackBuffer; j++)
-		gNumCubesCount[j] = gTotalNumCubes;
+		gNumCubesCount[j] = 128;
 
 	gTRenderFenceValue[0] = 1;
 	gTRenderFenceValue[1] = 1;
@@ -928,13 +1020,18 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			pComputeList->SetComputeRootDescriptorTable(ROOT_TABLE_UAV, heapPtr);
 
 			pComputeList->SetComputeRoot32BitConstants(2, 5, reinterpret_cast<LPCVOID>(&cbData), 0);
-
+			gComputeTimer.start(pComputeList, 0);
 			pComputeList->Dispatch(
-				InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0), 1, 1);
+				ceil(InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0)/128),
+				1,
+				1);
 
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			pComputeList->ResourceBarrier(1, &srvToUav);
+			
+			gComputeTimer.stop(pComputeList, 0);
+			gComputeTimer.resolveQueryToCPU(pComputeList, 0);
 
 			TIF(pComputeList->Close());
 		}
@@ -968,6 +1065,16 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 		PIXEndEvent(pComputeQueue);
 
+		//get compute time in ms
+		UINT64 queueFreq;
+		pComputeQueue->GetTimestampFrequency(&queueFreq);
+		double timestampToMs = (1.0 / queueFreq) * 1000.0;
+
+		D3D12::GPUTimestampPair computeTime = gComputeTimer.getTimestampPair(0);
+
+		UINT64 dtQ		= computeTime.Stop - computeTime.Start;
+		computeTimeInMs = dtQ * timestampToMs;
+		perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
 
 		backbufferIndex++;
 		backbufferIndex %= gThreadPerBackBuffer;
@@ -1149,4 +1256,57 @@ void CreateParticleFormation(ParticleFormation formation,
 	}
 }
 
-//void waitForQueue(ID3D12Fence* fence, )
+float VRamUsage()
+{
+	float memoryUsage;
+	IDXGIFactory* dxgifactory = nullptr;
+	HRESULT ret_code =
+		::CreateDXGIFactory(__uuidof(IDXGIFactory), reinterpret_cast<void**>(&dxgifactory));
+
+	if(SUCCEEDED(ret_code))
+	{
+		IDXGIAdapter* dxgiAdapter = nullptr;
+
+		if(SUCCEEDED(dxgifactory->EnumAdapters(0, &dxgiAdapter)))
+		{
+			IDXGIAdapter4* dxgiAdapter4 = NULL;
+			if(SUCCEEDED(
+				   dxgiAdapter->QueryInterface(__uuidof(IDXGIAdapter4), (void**)&dxgiAdapter4)))
+			{
+				DXGI_QUERY_VIDEO_MEMORY_INFO info;
+
+				if(SUCCEEDED(dxgiAdapter4->QueryVideoMemoryInfo(
+					   0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+				{
+					memoryUsage = float(info.CurrentUsage / 1024.0 / 1024.0); //MiB
+				};
+
+				dxgiAdapter4->Release();
+			}
+			dxgiAdapter->Release();
+		}
+		dxgifactory->Release();
+	}
+
+	return memoryUsage;
+}
+
+void WriteToFile()
+{
+	std::ofstream myfile;
+	myfile.open("Data.txt");
+	myfile << "Index\tTime Elapsed(ms)\tParticle Count\tDispatch Duration(ms)\tDraw "
+			  "Duration(ms)\tFrame Time(ms)\tVRAM Usage(MB)\t";
+	myfile << vRam << "\n";
+	for(int i = 0; i < perfDataIndex; i++)
+	{
+		myfile << i << "\t";
+		myfile << perfData[i].currentTime << "\t";
+		myfile << perfData[i].particleCount << "\t";
+		myfile << perfData[i].DispatchDuration << "\t";
+		myfile << perfData[i].DrawDuration << "\t";
+		myfile << perfData[i].FrameTime << "\t";
+		myfile << "\n";
+	}
+	myfile.close();
+}

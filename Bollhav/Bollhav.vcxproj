@@ -164,6 +164,7 @@
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Utility\D3D12Timer.cpp" />
     <ClCompile Include="Utility\ObjLoader.cpp" />
     <ClCompile Include="Core\Render\Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
@@ -193,6 +194,7 @@
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
+    <ClInclude Include="Utility\D3D12Timer.h" />
     <ClInclude Include="Utility\d3dx12.h" />
     <ClInclude Include="Utility\ObjLoader.h" />
     <ClInclude Include="Core\Render\Renderer.h" />

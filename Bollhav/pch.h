@@ -15,7 +15,7 @@ constexpr int NUM_BACKBUFFERS = 2;
 
 #include <pix3.h>
 #include <wrl.h>
-	using namespace Microsoft::WRL;
+using namespace Microsoft::WRL;
 
 // Window
 #ifndef WIN32_LEAN_AND_MEAN
@@ -27,12 +27,14 @@ constexpr int NUM_BACKBUFFERS = 2;
 #include <windows.h>
 
 // Utility
+#include "Utility/D3D12Timer.h"
 #include <assert.h>
 #include <comdef.h>
 #include <functional> // For std::function
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 // ImGui
 #include <Utility/imgui.h>

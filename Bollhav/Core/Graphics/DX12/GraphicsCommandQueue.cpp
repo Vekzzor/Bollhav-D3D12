@@ -40,6 +40,11 @@ void GraphicsCommandQueue::WaitForGPU()
 	WaitForSingleObject(m_hFenceEvent, INFINITE);
 }
 
+void GraphicsCommandQueue::GetTimestampFrequency(UINT64* qFrec) 
+{
+	m_pCommandQueue->GetTimestampFrequency(qFrec);
+}
+
 ID3D12CommandQueue* GraphicsCommandQueue::operator->(void)
 {
 	return m_pCommandQueue.Get();
