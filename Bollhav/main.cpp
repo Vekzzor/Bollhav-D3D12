@@ -76,13 +76,13 @@ struct PerformanceData
 	double DrawDuration		= 0;
 } perfData[1000]{};
 
-UINT perfDataIndex					= 0;
-UINT particleAmount					= 0;
-float m_time						= 0;
-static double computeTimeInMs		= 0;
-static double renderTimeInMs		= 0;
-static double totalFrameTimeInMs	= 0;
-static float vRam					= 0;
+UINT perfDataIndex				 = 0;
+UINT particleAmount				 = 0;
+float m_time					 = 0;
+static double computeTimeInMs	= 0;
+static double renderTimeInMs	 = 0;
+static double totalFrameTimeInMs = 0;
+static float vRam				 = 0;
 
 D3D12::D3D12Timer gComputeTimer;
 D3D12::D3D12Timer gRenderTimer;
@@ -124,9 +124,9 @@ enum ROOT_TABLE : unsigned char
 struct CBData
 {
 	volatile ULONG numCubes = 128;
-	UINT numBlocks = 1;
+	UINT numBlocks			= 1;
 
-	float dt		 = 0.001f*0.1f;
+	float dt		 = 0.001f * 0.1f;
 	float damping	= 1.0f;
 	float centerMass = 10000.0f * 10000.0f;
 } cbData[gThreadPerBackBuffer]{};
@@ -169,6 +169,9 @@ ComPtr<ID3D12Fence> gTCopyFence[gThreadPerBackBuffer];
 volatile UINT64 gTCopyFenceValue[gThreadPerBackBuffer];
 
 HANDLE gTEvent[THREAD_TYPE_COUNT][gThreadPerBackBuffer];
+
+HANDLE gTStartComputeEvent[gThreadPerBackBuffer];
+HANDLE gTWaitComputeEvent[gThreadPerBackBuffer];
 
 ComPtr<ID3D12Fence> gTRenderFence[gThreadPerBackBuffer];
 volatile UINT64 gTRenderFenceValue[gThreadPerBackBuffer];
@@ -342,22 +345,20 @@ int main(int, char**)
 
 	//fm.SyncCommandQueue(currentFrame, CommandQueue.GetCommandQueue());
 
-
 	static float m_timer									   = 0;
 	static float m_particleGenTimer							   = 0;
 	const double UPDATE_TIME								   = 1.0 / 60.0;
 	static float dt											   = 1 / 60;
-	static float lastDt = dt;
+	static float lastDt										   = dt;
 	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
 	std::chrono::time_point<std::chrono::steady_clock> currentTime =
 		std::chrono::steady_clock::now();
 
-
-	perfData[perfDataIndex].currentTime = 0;
-	perfData[perfDataIndex].particleCount = 128;
-	perfData[perfDataIndex].DrawDuration = 0;
+	perfData[perfDataIndex].currentTime		 = 0;
+	perfData[perfDataIndex].particleCount	= 128;
+	perfData[perfDataIndex].DrawDuration	 = 0;
 	perfData[perfDataIndex].DispatchDuration = 0;
-	perfData[perfDataIndex].FrameTime = 0;
+	perfData[perfDataIndex].FrameTime		 = 0;
 	perfDataIndex++;
 
 	vRam							 = VRamUsage();
@@ -379,7 +380,6 @@ int main(int, char**)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-
 		static bool wireframe = false;
 
 		if(Input::IsKeyTyped('F'))
@@ -387,7 +387,7 @@ int main(int, char**)
 			wireframe = !wireframe;
 			fm.WaitForLastSubmittedFrame();
 		}
-	
+
 		// Camera stuff
 		{
 			float deltaTime		 = 0.01f;
@@ -410,7 +410,7 @@ int main(int, char**)
 				camera.rotate(-dx * deltaTime, -dy * deltaTime);
 			}
 
-			float speed = Input::IsKeyPressed(VK_SHIFT) ? 20000*dt : 5000*dt;
+			float speed = Input::IsKeyPressed(VK_SHIFT) ? 20000 * dt : 5000 * dt;
 			if(GetAsyncKeyState('W'))
 				camMovement -= camRotMat.r[2] * deltaTime * speed;
 			if(GetAsyncKeyState('S'))
@@ -429,44 +429,36 @@ int main(int, char**)
 		}
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
 
-		cbData[frameIndex].dt = dt / 10;
+		cbData[frameIndex].dt	 = dt / 10;
 		cbData[1 - frameIndex].dt = cbData[frameIndex].dt;
 		if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
 		{
 			m_time += m_particleGenTimer;
 			//lastFrameIndexHit			 = frameIndex;
-			cbData[frameIndex].numCubes		 /*= gNumCubesCount[frameIndex]*/ += 128;
-			cbData[frameIndex].numBlocks	 = ceil(cbData[frameIndex].numCubes / 128);
-			cbData[1 - frameIndex].numCubes  /*= gNumCubesCount[1 - frameIndex]*/ += 128;
+			cbData[frameIndex].numCubes /*= gNumCubesCount[frameIndex]*/ += 128;
+			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
+			cbData[1 - frameIndex].numCubes /*= gNumCubesCount[1 - frameIndex]*/ += 128;
 			cbData[1 - frameIndex].numBlocks = ceil(cbData[1 - frameIndex].numCubes / 128);
 			m_particleGenTimer -= particleInterval;
 
-			particleAmount						  = cbData[frameIndex].numCubes;
-			perfData[perfDataIndex].currentTime   = m_time;
-			perfData[perfDataIndex].particleCount = cbData[frameIndex].numCubes;
+			particleAmount							 = cbData[frameIndex].numCubes;
+			perfData[perfDataIndex].currentTime		 = m_time;
+			perfData[perfDataIndex].particleCount	= cbData[frameIndex].numCubes;
 			perfData[perfDataIndex - 1].DrawDuration = renderTimeInMs;
 			//perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
 			perfData[perfDataIndex - 1].FrameTime = 1000.0f / ImGui::GetIO().Framerate;
 			perfDataIndex++;
 		}
-		#if MULTITHREAD == 0
-			ComputeThreadProc(nullptr);
-		#endif
-		
+#if MULTITHREAD == 0
+		ComputeThreadProc(nullptr);
+#endif
+
 		// Rendering
 		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
 
-		// Now lets wait for the compute to finish
+		// Start the compute thread
+		SetEvent(gTWaitComputeEvent[frameIndex]);
 
-		UINT64 fenceVal  = InterlockedCompareExchange(&gTComputeFenceValue[frameIndex], 0, 0);
-		UINT64 actualVal = gTComputeFence[frameIndex]->GetCompletedValue();
-		if(actualVal < fenceVal)
-		{
-			// Instruct the queue to wait for the current compute work to finish
-			CommandQueue->Wait(gTComputeFence[frameIndex].Get(), fenceVal);
-			
-			//InterlockedExchange(&gTComputeFenceValue[frameIndex], 0);
-		}
 		//Fill command list
 		{
 			TIF(currentFrame->GetDirectAllocator()->Reset());
@@ -507,13 +499,43 @@ int main(int, char**)
 
 			ImGui::Render();
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
-			
+
 			gRenderTimer.stop(cl.GetPtr(), 0);
 			gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
 
 			cl.Finish();
-
 		}
+		
+		// Wait for the compute thread to finish recording
+		WaitForSingleObject(gTStartComputeEvent[frameIndex], INFINITE);
+
+
+		ResetEvent(gTStartComputeEvent[frameIndex]);
+		// Execute
+		ID3D12CommandList* Lists[] = {gTComputeList.Get()};
+		gTComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
+
+		// Wait for the compute to finish.
+		{
+			UINT64 threadFenceValue = InterlockedIncrement(&gTComputeFenceValue[frameIndex]);
+			TIF(gTComputeQueue->Signal(gTComputeFence[frameIndex].Get(), threadFenceValue));
+
+			TIF(gTComputeFence[frameIndex]->SetEventOnCompletion(threadFenceValue,
+																 gTEvent[COMPUTE][frameIndex]));
+
+			WaitForSingleObject(gTEvent[COMPUTE][frameIndex], INFINITE);
+		}
+
+		//get compute time in ms
+		UINT64 queueFreq;
+		gTComputeQueue->GetTimestampFrequency(&queueFreq);
+		double timestampToMs = (1.0 / queueFreq) * 1000.0;
+
+		D3D12::GPUTimestampPair computeTime = gComputeTimer.getTimestampPair(0);
+
+		UINT64 dtQ									 = computeTime.Stop - computeTime.Start;
+		computeTimeInMs								 = dtQ * timestampToMs;
+		perfData[perfDataIndex - 1].DispatchDuration = computeTimeInMs;
 
 		CommandQueue.SubmitList(cl.GetPtr());
 		CommandQueue.Execute();
@@ -524,7 +546,7 @@ int main(int, char**)
 		fm.SyncCommandQueue(currentFrame, CommandQueue.GetCommandQueue());
 		currentFrame = fm.GetReadyFrame(&sc);
 		InterlockedIncrement(&gTRenderFenceValue[frameIndex]);
-	
+
 		//Timestamps
 		{
 			UINT64 queueFreq	 = 0;
@@ -539,8 +561,6 @@ int main(int, char**)
 			UINT64 dtQ	 = drawTime.Stop - drawTime.Start;
 			renderTimeInMs = dtQ * timestampToMs;
 
-
-			
 			//cbData[frameIndex].dt = dt / 10;
 			/*if(lastFrameIndexHit != frameIndex && particlesIncreased)
 		{
@@ -548,17 +568,16 @@ int main(int, char**)
 			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
 			particlesIncreased			 = false;
 		}*/
-
-
 		}
 
 		currentTime = std::chrono::steady_clock::now();
-		lastDt = dt;
+		lastDt		= dt;
 		dt = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTime - preTime).count() /
 			 1000000000.0f;
 		preTime = currentTime;
 	}
-
+	SetEvent(gTWaitComputeEvent[0]);
+	SetEvent(gTWaitComputeEvent[1]);
 	InterlockedExchange(&gThreadsRunning, 0L);
 	WaitForSingleObject(gThreadHandles[COMPUTE], INFINITE);
 	WaitForSingleObject(gThreadHandles[COPY], INFINITE);
@@ -849,8 +868,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 			srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
 			srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
-			_pDevice->CreateShaderResourceView(
-				gTPosBuffer.Get(), &srvDesc, heapPointer);
+			_pDevice->CreateShaderResourceView(gTPosBuffer.Get(), &srvDesc, heapPointer);
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
@@ -862,8 +880,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 			uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
 
 			heapPointer.ptr += gDescriptorSize;
-			_pDevice->CreateUnorderedAccessView(
-				gTPosBuffer.Get(), nullptr, &uavDesc, heapPointer);
+			_pDevice->CreateUnorderedAccessView(gTPosBuffer.Get(), nullptr, &uavDesc, heapPointer);
 
 			// Get the layouts
 			UINT nRows;
@@ -895,7 +912,6 @@ void CreateThreads(ID3D12Device* _pDevice)
 			ID3D12Fence* pCopyFence				   = gTCopyFence[backbufferIndex].Get();
 
 			PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
-		
 
 			// Do the copying!
 			UINT dataSizeInBytes = sizeof(gPositions);
@@ -942,8 +958,6 @@ void CreateThreads(ID3D12Device* _pDevice)
 			TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
 			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
 
-		
-
 			PIXEndEvent(pCopyQueue);
 
 			TIF(pCopyAllocator->Reset());
@@ -960,7 +974,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 		desc.Flags					  = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		desc.NodeMask				  = 0;
 		desc.Priority				  = 0;
-		
+
 		{
 			_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gTComputeQueue));
 			NAME_D3D12_OBJECT(gTComputeQueue);
@@ -981,32 +995,37 @@ void CreateThreads(ID3D12Device* _pDevice)
 			gTComputeFenceValue[0] = 0;
 			gTComputeFenceValue[1] = 0;
 
-			_pDevice->CreateFence(
-				0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTComputeFence[0]));
-			_pDevice->CreateFence(
-				0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTComputeFence[1]));
+			_pDevice->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTComputeFence[0]));
+			_pDevice->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTComputeFence[1]));
 
 			gTEvent[COMPUTE][0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		}
+
+		gTWaitComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		gTWaitComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+		gTStartComputeEvent[0]  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		gTStartComputeEvent[1]  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
 		gThreadIndexes[COMPUTE] = threadIndex;
-		#if MULTITHREAD == 1
+#if MULTITHREAD == 1
 		gThreadHandles[COMPUTE] = CreateThread(nullptr,
 											   0,
 											   ComputeThreadProc,
 											   reinterpret_cast<LPVOID>(&gThreadIndexes[COMPUTE]),
 											   CREATE_SUSPENDED,
 											   nullptr);
-											   
+
 		ResumeThread(gThreadHandles[COMPUTE]);
-		#endif
+#endif
 	}
 }
 
 DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 {
-	#if MULTITHREAD == 1
+#if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
-	#endif
+#endif
 	unsigned int backbufferIndex = 0;
 	bool firstRun				 = true;
 	do
@@ -1017,6 +1036,13 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 		ID3D12Fence* pComputeFence				  = gTComputeFence[backbufferIndex].Get();
 
 		PIXBeginEvent(pComputeQueue, 0, L"Compute");
+
+		// wait until render is finished
+		WaitForSingleObject(gTWaitComputeEvent[backbufferIndex], INFINITE);
+
+		// When waiting done, we set this to waiting state
+		ResetEvent(gTWaitComputeEvent[backbufferIndex]);
+	
 
 		// Fill compute list
 		{
@@ -1046,60 +1072,23 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			pComputeList->SetComputeRoot32BitConstants(2, 5, reinterpret_cast<LPCVOID>(&cbData), 0);
 			gComputeTimer.start(pComputeList, 0);
-			pComputeList->Dispatch(
-				cbData[backbufferIndex].numBlocks,
-				1,
-				1);
+			pComputeList->Dispatch(cbData[backbufferIndex].numBlocks, 1, 1);
 
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			pComputeList->ResourceBarrier(1, &srvToUav);
-			
+
 			gComputeTimer.stop(pComputeList, 0);
 			gComputeTimer.resolveQueryToCPU(pComputeList, 0);
 
 			TIF(pComputeList->Close());
 		}
-
-		// Execute
-		ID3D12CommandList* Lists[] = {pComputeList};
-		pComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
-
-		// Wait for the compute to finish.
-		{
-			UINT64 threadFenceValue = InterlockedIncrement(&gTComputeFenceValue[backbufferIndex]);
-			TIF(pComputeQueue->Signal(gTComputeFence[backbufferIndex].Get(), threadFenceValue));
-
-			TIF(gTComputeFence[backbufferIndex]->SetEventOnCompletion(
-				threadFenceValue, gTEvent[COMPUTE][backbufferIndex]));
-
-			WaitForSingleObject(gTEvent[COMPUTE][backbufferIndex], INFINITE);
-		}
-
-		//Wait if raster has not finished
-		UINT64 fenceVal  = InterlockedCompareExchange(&gTRenderFenceValue[backbufferIndex], 0, 0);
-		UINT64 actualVal = gTRenderFence[backbufferIndex]->GetCompletedValue();
-		if(actualVal < fenceVal)
-		{
-
-			TIF(pComputeQueue->Wait(gTRenderFence[backbufferIndex].Get(), fenceVal));
-
-		}
-
 	
 
+		// Message that the recording is finished
+		SetEvent(gTStartComputeEvent[backbufferIndex]);
+
 		PIXEndEvent(pComputeQueue);
-
-		//get compute time in ms
-		UINT64 queueFreq;
-		pComputeQueue->GetTimestampFrequency(&queueFreq);
-		double timestampToMs = (1.0 / queueFreq) * 1000.0;
-
-		D3D12::GPUTimestampPair computeTime = gComputeTimer.getTimestampPair(0);
-
-		UINT64 dtQ		= computeTime.Stop - computeTime.Start;
-		computeTimeInMs = dtQ * timestampToMs;
-		perfData[perfDataIndex-1].DispatchDuration = computeTimeInMs;
 
 		backbufferIndex++;
 		backbufferIndex %= gThreadPerBackBuffer;
@@ -1122,7 +1111,6 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		ID3D12Fence* pCopyFence				   = gTCopyFence[backbufferIndex].Get();
 
 		PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
-		
 
 		// Now we need to wait for the directQueue to finish
 		UINT64 renderContextFenceValue =
@@ -1141,17 +1129,13 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 																 gTEvent[COPY][backbufferIndex]);
 
 			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);*/
-		
 		}
 
 		//InterlockedExchange(&gTRenderFenceValue[backbufferIndex], 0);
 		//std::cout << "Copy\n";
 		// Do the copying!
 		UINT dataSizeInBytes = sizeof(DATA);
-		UINT64 inArrayOffset =
-			(cbData[backbufferIndex].numCubes
-			 - 1) *
-			dataSizeInBytes;
+		UINT64 inArrayOffset = (cbData[backbufferIndex].numCubes - 1) * dataSizeInBytes;
 		UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
 
 		BYTE* pData;
@@ -1194,7 +1178,6 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
 		WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
 
-	
 		/*	InterlockedIncrement(&gNumCubesCount[backbufferIndex]);
 		gNumCubesCount[backbufferIndex] = (gNumCubesCount[backbufferIndex] > (gTotalNumCubes - 1))
 											  ? 1
