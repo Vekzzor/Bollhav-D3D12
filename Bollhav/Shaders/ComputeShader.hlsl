@@ -31,7 +31,6 @@ static float g_fParticleMass = g_fG * defMass * defMass;
 
 void bodyBodyInteraction(inout float3 ai, float3 bj, float3 bi, float mass, int particles)
 {
-	//dir
 	float3 r	  = bj.xyz - bi.xyz;
 	float distSqr = dot(r, r);
 	distSqr += softeningSquared;
@@ -40,6 +39,8 @@ void bodyBodyInteraction(inout float3 ai, float3 bj, float3 bi, float mass, int 
 	float invDistCube = invDist * invDist * invDist;
 
 	float s = mass * invDistCube * particles;
+	
+	//acceleration
 	ai += r * s;
 }
 

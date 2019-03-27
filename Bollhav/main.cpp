@@ -19,6 +19,9 @@
 
 #include <Core/Input/Input.h>
 #include <strsafe.h>
+
+#define MULTITHREAD 1
+static const bool gMultithread = MULTITHREAD;
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
@@ -88,8 +91,8 @@ constexpr UINT gThreadCount			= 1;
 constexpr UINT gThreadPerBackBuffer = 2;
 // Buffer containing positions
 constexpr UINT blockSize	  = 128;
-constexpr UINT gTotalNumCubes = blockSize * blockSize * 7;
-volatile ULONG gNumCubesCount[gThreadPerBackBuffer];
+constexpr UINT gTotalNumCubes = blockSize * blockSize * 1.5;
+//volatile ULONG gNumCubesCount[gThreadPerBackBuffer];
 
 struct DATA
 {
@@ -120,13 +123,13 @@ enum ROOT_TABLE : unsigned char
 
 struct CBData
 {
-	UINT numCubes  = 128;
+	volatile ULONG numCubes = 128;
 	UINT numBlocks = 1;
 
-	float dt		 = 0.001f*0.1;
+	float dt		 = 0.001f*0.1f;
 	float damping	= 1.0f;
 	float centerMass = 10000.0f * 10000.0f;
-} cbData{};
+} cbData[gThreadPerBackBuffer]{};
 
 // Thread
 enum Thread_Type : unsigned char
@@ -176,7 +179,7 @@ int main(int, char**)
 {
 	InitializeCriticalSection(&mutex);
 
-	Window window(VideoMode(1280, 720), L"Hejsan");
+	Window window(VideoMode(1920, 1080), L"Hejsan");
 
 	Device device;
 	//Init Timers to collect timestamps from GPU
@@ -344,14 +347,22 @@ int main(int, char**)
 	static float m_particleGenTimer							   = 0;
 	const double UPDATE_TIME								   = 1.0 / 60.0;
 	static float dt											   = 1 / 60;
+	static float lastDt = dt;
 	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
 	std::chrono::time_point<std::chrono::steady_clock> currentTime =
 		std::chrono::steady_clock::now();
 
 
+	perfData[perfDataIndex].currentTime = 0;
+	perfData[perfDataIndex].particleCount = 128;
+	perfData[perfDataIndex].DrawDuration = 0;
+	perfData[perfDataIndex].DispatchDuration = 0;
+	perfData[perfDataIndex].FrameTime = 0;
+	perfDataIndex++;
+
 	vRam							 = VRamUsage();
 	bool particlesIncreased			 = false;
-	constexpr float particleInterval = 0.01;
+	constexpr float particleInterval = 0.05;
 	UINT lastFrameIndexHit			 = 0;
 	CreateThreads(device.GetDevice());
 	/*currentFrame = fm.GetReadyFrame(&sc);
@@ -359,13 +370,15 @@ int main(int, char**)
 	cl->Close();
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
-		
+		m_timer += dt;
+		m_particleGenTimer += dt;
 		window.pollEvents();
 
 		// Start the Dear ImGui frame
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+
 
 		static bool wireframe = false;
 
@@ -374,7 +387,7 @@ int main(int, char**)
 			wireframe = !wireframe;
 			fm.WaitForLastSubmittedFrame();
 		}
-
+	
 		// Camera stuff
 		{
 			float deltaTime		 = 0.01f;
@@ -397,7 +410,7 @@ int main(int, char**)
 				camera.rotate(-dx * deltaTime, -dy * deltaTime);
 			}
 
-			float speed = Input::IsKeyPressed(VK_SHIFT) ? 10 : 5;
+			float speed = Input::IsKeyPressed(VK_SHIFT) ? 20000*dt : 5000*dt;
 			if(GetAsyncKeyState('W'))
 				camMovement -= camRotMat.r[2] * deltaTime * speed;
 			if(GetAsyncKeyState('S'))
@@ -414,25 +427,31 @@ int main(int, char**)
 			camera.move(camMovement);
 			camera.update(deltaTime);
 		}
-
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
-		
-		m_particleGenTimer += dt;
-		if(particlesIncreased && frameIndex != lastFrameIndexHit)
-		{
-			gNumCubesCount[frameIndex] += 128;
-			particlesIncreased = false;
-		}
-		else if(gNumCubesCount[frameIndex] < gTotalNumCubes)
+
+		cbData[frameIndex].dt = dt / 10;
+		cbData[1 - frameIndex].dt = cbData[frameIndex].dt;
+		if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
 		{
 			m_time += m_particleGenTimer;
-			lastFrameIndexHit = frameIndex;
-			particleAmount = gNumCubesCount[frameIndex] += 128;
-			//cbData.numBlocks = ceil(gNumCubesCount[frameIndex] / 128);
-			cbData.numCubes = particleAmount;
+			//lastFrameIndexHit			 = frameIndex;
+			cbData[frameIndex].numCubes		 /*= gNumCubesCount[frameIndex]*/ += 128;
+			cbData[frameIndex].numBlocks	 = ceil(cbData[frameIndex].numCubes / 128);
+			cbData[1 - frameIndex].numCubes  /*= gNumCubesCount[1 - frameIndex]*/ += 128;
+			cbData[1 - frameIndex].numBlocks = ceil(cbData[1 - frameIndex].numCubes / 128);
 			m_particleGenTimer -= particleInterval;
-			particlesIncreased = true;
+
+			particleAmount						  = cbData[frameIndex].numCubes;
+			perfData[perfDataIndex].currentTime   = m_time;
+			perfData[perfDataIndex].particleCount = cbData[frameIndex].numCubes;
+			perfData[perfDataIndex - 1].DrawDuration = renderTimeInMs;
+			//perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
+			perfData[perfDataIndex - 1].FrameTime = 1000.0f / ImGui::GetIO().Framerate;
+			perfDataIndex++;
 		}
+		#if MULTITHREAD == 0
+			ComputeThreadProc(nullptr);
+		#endif
 		
 		// Rendering
 		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
@@ -448,50 +467,53 @@ int main(int, char**)
 			
 			//InterlockedExchange(&gTComputeFenceValue[frameIndex], 0);
 		}
+		//Fill command list
+		{
+			TIF(currentFrame->GetDirectAllocator()->Reset());
 
-		TIF(currentFrame->GetDirectAllocator()->Reset());
+			cl.Prepare(currentFrame->GetDirectAllocator(), sc.GetCurrentRenderTarget());
 
-		cl.Prepare(currentFrame->GetDirectAllocator(), sc.GetCurrentRenderTarget());
+			cl->OMSetRenderTargets(
+				1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
+			ds.Clear(cl.GetPtr());
 
-		cl->OMSetRenderTargets(
-			1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
-		ds.Clear(cl.GetPtr());
+			cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
 
-		cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
+			cl->SetGraphicsRootSignature(pRootGraphics.Get());
 
-		cl->SetGraphicsRootSignature(pRootGraphics.Get());
+			cl->SetGraphicsRoot32BitConstants(
+				1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
 
-		cl->SetGraphicsRoot32BitConstants(
-			1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
+			cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer->GetGPUVirtualAddress());
 
-		cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer->GetGPUVirtualAddress());
+			cl->RSSetViewports(1, &vp);
+			cl->RSSetScissorRects(1, &scissor);
 
-		cl->RSSetViewports(1, &vp);
-		cl->RSSetScissorRects(1, &scissor);
+			// Draw cube
+			cl->SetPipelineState(gps.GetPtr());
+			cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
 
-		// Draw cube
-		cl->SetPipelineState(gps.GetPtr());
-		cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
+			gRenderTimer.start(cl.GetPtr(), 0);
+			cl->DrawInstanced(boxBuffer.GetVertexCount(), cbData[frameIndex].numCubes, 0, 0);
 
-		gRenderTimer.start(cl.GetPtr(), 0);
-		cl->DrawInstanced(boxBuffer.GetVertexCount(), gNumCubesCount[0], 0, 0);
+			// Draw Grid
+			//grid.Draw(cl.GetPtr());
 
-		// Draw Grid
-		//grid.Draw(cl.GetPtr());
+			ImguiDraw(cl.GetPtr());
 
-		ImguiDraw(cl.GetPtr());
+			ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
+			cl->SetDescriptorHeaps(1, ppHeaps);
 
-		ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
-		cl->SetDescriptorHeaps(1, ppHeaps);
+			ImGui::Render();
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
+			
+			gRenderTimer.stop(cl.GetPtr(), 0);
+			gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
 
-		ImGui::Render();
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
-		
-		gRenderTimer.stop(cl.GetPtr(), 0);
-		gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
+			cl.Finish();
 
-		cl.Finish();
+		}
 
 		CommandQueue.SubmitList(cl.GetPtr());
 		CommandQueue.Execute();
@@ -503,36 +525,38 @@ int main(int, char**)
 		currentFrame = fm.GetReadyFrame(&sc);
 		InterlockedIncrement(&gTRenderFenceValue[frameIndex]);
 	
+		//Timestamps
+		{
+			UINT64 queueFreq	 = 0;
+			double timestampToMs = (1.0 / queueFreq) * 1000.0;
 
-		UINT64 queueFreq = 0;
-		double timestampToMs = (1.0 / queueFreq) * 1000.0;
+			//get render time in ms
+			CommandQueue.GetTimestampFrequency(&queueFreq);
+			timestampToMs					 = (1.0 / queueFreq) * 1000.0;
+			D3D12::GPUTimestampPair drawTime = gRenderTimer.getTimestampPair(0);
+			drawTime						 = gRenderTimer.getTimestampPair(0);
 
-		//get render time in ms
-		CommandQueue.GetTimestampFrequency(&queueFreq);
-		timestampToMs					 = (1.0 / queueFreq) * 1000.0;
-		D3D12::GPUTimestampPair drawTime = gRenderTimer.getTimestampPair(0);
-		drawTime						 = gRenderTimer.getTimestampPair(0);
+			UINT64 dtQ	 = drawTime.Stop - drawTime.Start;
+			renderTimeInMs = dtQ * timestampToMs;
 
-		UINT64 dtQ  = drawTime.Stop - drawTime.Start;
-		renderTimeInMs = dtQ * timestampToMs;
 
+			
+			//cbData[frameIndex].dt = dt / 10;
+			/*if(lastFrameIndexHit != frameIndex && particlesIncreased)
+		{
+			cbData[frameIndex].numCubes += 128;
+			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
+			particlesIncreased			 = false;
+		}*/
+
+
+		}
 
 		currentTime = std::chrono::steady_clock::now();
+		lastDt = dt;
 		dt = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTime - preTime).count() /
 			 1000000000.0f;
 		preTime = currentTime;
-		if(particlesIncreased)
-		{
-			perfData[perfDataIndex].currentTime		 = m_time;
-			perfData[perfDataIndex].particleCount	= cbData.numCubes;
-			perfData[perfDataIndex].DrawDuration	 = renderTimeInMs;
-			//perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
-			perfData[perfDataIndex].FrameTime		 = 1000.0f / ImGui::GetIO().Framerate;
-			perfDataIndex++;
-		}
-
-		/*std::cout << "Render[" << frameIndex << "]"
-				  << " Done " << std::endl;*/
 	}
 
 	InterlockedExchange(&gThreadsRunning, 0L);
@@ -710,6 +734,7 @@ void ImguiDraw(ID3D12GraphicsCommandList* _pCommandList)
 		ImGui::Text("Particle ammount: %.iK", particleAmount / 1000);
 		ImGui::Text("VRAM Usage: %.0fMB", vRam);
 		ImGui::Text("Time: %.1fs", m_time);
+		ImGui::Text("MultiThreaded: %i", gMultithread);
 		ImGui::End();
 	}
 }
@@ -718,8 +743,8 @@ void CreateThreads(ID3D12Device* _pDevice)
 {
 	gDescriptorSize =
 		_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	for(unsigned j = 0; j < gThreadPerBackBuffer; j++)
-		gNumCubesCount[j] = 128;
+	/*for(unsigned j = 0; j < gThreadPerBackBuffer; j++)
+		gNumCubesCount[j] = 128;*/
 
 	gTRenderFenceValue[0] = 1;
 	gTRenderFenceValue[1] = 1;
@@ -964,34 +989,34 @@ void CreateThreads(ID3D12Device* _pDevice)
 			gTEvent[COMPUTE][0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		}
 		gThreadIndexes[COMPUTE] = threadIndex;
+		#if MULTITHREAD == 1
 		gThreadHandles[COMPUTE] = CreateThread(nullptr,
 											   0,
 											   ComputeThreadProc,
 											   reinterpret_cast<LPVOID>(&gThreadIndexes[COMPUTE]),
 											   CREATE_SUSPENDED,
 											   nullptr);
-
+											   
 		ResumeThread(gThreadHandles[COMPUTE]);
+		#endif
 	}
 }
 
 DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 {
+	#if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
-
+	#endif
 	unsigned int backbufferIndex = 0;
 	bool firstRun				 = true;
-	while(InterlockedCompareExchange(&gThreadsRunning, 0, 0))
+	do
 	{
-
 		ID3D12CommandQueue* pComputeQueue		  = gTComputeQueue.Get();
 		ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator.Get();
 		ID3D12GraphicsCommandList* pComputeList   = gTComputeList.Get();
 		ID3D12Fence* pComputeFence				  = gTComputeFence[backbufferIndex].Get();
 
 		PIXBeginEvent(pComputeQueue, 0, L"Compute");
-
-
 
 		// Fill compute list
 		{
@@ -1022,7 +1047,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			pComputeList->SetComputeRoot32BitConstants(2, 5, reinterpret_cast<LPCVOID>(&cbData), 0);
 			gComputeTimer.start(pComputeList, 0);
 			pComputeList->Dispatch(
-				ceil(InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0)/128),
+				cbData[backbufferIndex].numBlocks,
 				1,
 				1);
 
@@ -1074,11 +1099,11 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 		UINT64 dtQ		= computeTime.Stop - computeTime.Start;
 		computeTimeInMs = dtQ * timestampToMs;
-		perfData[perfDataIndex].DispatchDuration = computeTimeInMs;
+		perfData[perfDataIndex-1].DispatchDuration = computeTimeInMs;
 
 		backbufferIndex++;
 		backbufferIndex %= gThreadPerBackBuffer;
-	}
+	} while(gMultithread && InterlockedCompareExchange(&gThreadsRunning, 0, 0));
 
 	return 0;
 }
@@ -1124,7 +1149,8 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		// Do the copying!
 		UINT dataSizeInBytes = sizeof(DATA);
 		UINT64 inArrayOffset =
-			(InterlockedCompareExchange(&gNumCubesCount[backbufferIndex], 0, 0) - 1) *
+			(cbData[backbufferIndex].numCubes
+			 - 1) *
 			dataSizeInBytes;
 		UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
 
