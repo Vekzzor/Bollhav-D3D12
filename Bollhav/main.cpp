@@ -124,7 +124,7 @@ enum ROOT_TABLE : unsigned char
 
 struct CBData
 {
-	volatile ULONG numCubes = 128;
+	volatile ULONG numCubes = 0;
 	UINT numBlocks			= 1;
 
 	float dt		 = 0.001f * 0.1f;
@@ -374,7 +374,7 @@ int main(int, char**)
 
 	cl->Close();
 
-	UINT cbIndex = NUM_BACKBUFFERS - 1;
+	UINT cbIndex = 0;
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
 		m_timer += dt;
@@ -433,11 +433,11 @@ int main(int, char**)
 			camera.move(camMovement);
 			camera.update(deltaTime);
 		}
-		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
+		const UINT frameIndex = (fm.m_fenceLastSignaledValue+1) % NUM_BACKBUFFERS;
 
 		cbData[frameIndex].dt = dt / 10;
 		cbData[cbIndex].dt	= cbData[frameIndex].dt;
-		if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
+		//if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
 		{
 			m_time += m_particleGenTimer;
 			//lastFrameIndexHit			 = frameIndex;
@@ -448,7 +448,7 @@ int main(int, char**)
 			m_particleGenTimer -= particleInterval;
 
 			cbIndex++;
-			cbIndex = cbIndex & NUM_BACKBUFFERS;
+			cbIndex = cbIndex % NUM_BACKBUFFERS;
 
 			/*		particleAmount								 = cbData[frameIndex].numCubes;
 			perfData[perfDataIndex].currentTime			 = m_time;
@@ -548,7 +548,7 @@ int main(int, char**)
 			copyToSrv.Type					 = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 			copyToSrv.Transition.pResource   = gTPosBuffer[frameIndex].Get();
 			copyToSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			copyToSrv.Transition.StateAfter  = D3D12_RESOURCE_STATE_COMMON;
+			copyToSrv.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
 			copyToSrv.Flags					 = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
 			cl->ResourceBarrier(1, &copyToSrv);
@@ -1054,8 +1054,8 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 #if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
 #endif
-	unsigned int backbufferIndex = 0;
-	UINT lastIndex				 = NUM_BACKBUFFERS - 1;
+	unsigned int backbufferIndex = 1;
+	UINT lastIndex				 = 0;
 	do
 	{
 		ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[backbufferIndex].Get();
@@ -1099,7 +1099,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			pComputeList->SetComputeRoot32BitConstants(2, 5, reinterpret_cast<LPCVOID>(&cbData), 0);
 			//gComputeTimer.start(pComputeList, 0);
-			pComputeList->Dispatch(cbData[backbufferIndex].numBlocks, 1, 1);
+			pComputeList->Dispatch(cbData[lastIndex].numBlocks, 1, 1);
 
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
@@ -1131,7 +1131,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 #if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
 #endif
-	unsigned int backbufferIndex = NUM_BACKBUFFERS - 1;
+	unsigned int backbufferIndex = 0;
 	do
 	{
 		ID3D12CommandAllocator* pCopyAllocator = gTCopyAllocator[backbufferIndex].Get();
@@ -1153,11 +1153,11 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 			// Do the copying!
 			UINT dataSizeInBytes = sizeof(DATA) * blockSize;
 			// TODO(Henrik): fixa numcubes
-			UINT64 inArrayOffset = ((cbData[backbufferIndex].numCubes) - blockSize) * sizeof(DATA);
+			UINT64 inArrayOffset = ((cbData[backbufferIndex].numCubes)-128) * sizeof(DATA);
 			UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
 
 			BYTE* pData;
-			TIF(gTCopyUpload[0]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+			TIF(gTCopyUpload[backbufferIndex]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
 
 			// Offset the pointer
 			pData += GPUBufferOffset;
@@ -1166,27 +1166,13 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 			memcpy(pData, inArrayStart, dataSizeInBytes);
 
-			gTCopyUpload[0]->Unmap(0, nullptr);
-
-			D3D12_RESOURCE_BARRIER barrier = {};
-			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
-			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-			//pCopyList->ResourceBarrier(1, &barrier);
+			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
 			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
 										inArrayOffset,
-										gTCopyUpload[0].Get(),
+										gTCopyUpload[backbufferIndex].Get(),
 										GPUBufferOffset,
 										dataSizeInBytes);
-
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-
-			//pCopyList->ResourceBarrier(1, &barrier);
 
 			TIF(pCopyList->Close());
 		}
