@@ -18,9 +18,10 @@
 #include <Core/Camera/FPSCamera.h>
 
 #include <Core/Input/Input.h>
+#include <crtdbg.h>
 #include <strsafe.h>
 
-#define MULTITHREAD 0
+#define MULTITHREAD 1
 static const bool gMultithread = MULTITHREAD;
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ImVec4 clear_color = ImVec4(0.15f, 0.15f, 0.20f, 1.00f);
@@ -113,7 +114,7 @@ ComPtr<ID3D12RootSignature> gRootCompute;
 ComPtr<ID3D12PipelineState> gComputePipeline;
 
 UINT gDescriptorSize;
-
+UINT gDescriptorStride;
 enum ROOT_TABLE : unsigned char
 {
 	ROOT_TABLE_SRV = 0,
@@ -163,7 +164,7 @@ ComPtr<ID3D12GraphicsCommandList> gTCopyList[gThreadPerBackBuffer];
 
 D3D12_PLACED_SUBRESOURCE_FOOTPRINT gTLayouts;
 ComPtr<ID3D12Resource> gTCopyUpload[gThreadPerBackBuffer];
-ComPtr<ID3D12Resource> gTPosBuffer;
+ComPtr<ID3D12Resource> gTPosBuffer[gThreadPerBackBuffer];
 
 ComPtr<ID3D12Fence> gTCopyFence[gThreadPerBackBuffer];
 volatile UINT64 gTCopyFenceValue[gThreadPerBackBuffer];
@@ -180,6 +181,7 @@ volatile LONG gThreadsRunning = 1L;
 
 int main(int, char**)
 {
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	InitializeCriticalSection(&mutex);
 
 	Window window(VideoMode(1920, 1080), L"Hejsan");
@@ -275,6 +277,7 @@ int main(int, char**)
 	cpsd.NodeMask						   = 0;
 
 	TIF(device->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&gComputePipeline)));
+	NAME_D3D12_OBJECT(gComputePipeline);
 
 	ComPtr<ID3D12GraphicsCommandList> pComputeList;
 
@@ -459,60 +462,12 @@ int main(int, char**)
 		SetEvent(gTWaitComputeEvent[frameIndex]);
 #endif
 
-		//Fill command list
-		{
-			TIF(currentFrame->GetDirectAllocator()->Reset());
-
-			cl.Prepare(currentFrame->GetDirectAllocator(), sc.GetCurrentRenderTarget());
-
-			cl->OMSetRenderTargets(
-				1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
-			ds.Clear(cl.GetPtr());
-
-			cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
-
-			cl->SetGraphicsRootSignature(pRootGraphics.Get());
-
-			cl->SetGraphicsRoot32BitConstants(
-				1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
-
-			cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer->GetGPUVirtualAddress());
-
-			cl->RSSetViewports(1, &vp);
-			cl->RSSetScissorRects(1, &scissor);
-
-			// Draw cube
-			cl->SetPipelineState(gps.GetPtr());
-			cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
-
-			gRenderTimer.start(cl.GetPtr(), 0);
-			cl->DrawInstanced(boxBuffer.GetVertexCount(), cbData[frameIndex].numCubes, 0, 0);
-
-			// Draw Grid
-			//grid.Draw(cl.GetPtr());
-
-			//ImguiDraw(cl.GetPtr());
-
-			ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
-			cl->SetDescriptorHeaps(1, ppHeaps);
-
-			ImGui::Render();
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
-
-			gRenderTimer.stop(cl.GetPtr(), 0);
-			gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
-
-			cl.Finish();
-		}
-		
-		// Wait for the compute thread to finish recording
-		#if MULTITHREAD == 1
+// Wait for the compute thread to finish recording
+#if MULTITHREAD == 1
 		WaitForSingleObject(gTStartComputeEvent[frameIndex], INFINITE);
-		
 
 		ResetEvent(gTStartComputeEvent[frameIndex]);
-		#endif
+#endif
 		// Execute
 		ID3D12CommandList* Lists[] = {gTComputeList.Get()};
 		gTComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
@@ -529,6 +484,7 @@ int main(int, char**)
 		}
 
 		//get compute time in ms
+		{
 		UINT64 queueFreq;
 		gTComputeQueue->GetTimestampFrequency(&queueFreq);
 		double timestampToMs = (1.0 / queueFreq) * 1000.0;
@@ -538,6 +494,54 @@ int main(int, char**)
 		UINT64 dtQ									 = computeTime.Stop - computeTime.Start;
 		computeTimeInMs								 = dtQ * timestampToMs;
 		perfData[perfDataIndex - 1].DispatchDuration = computeTimeInMs;
+		}
+
+				//Fill command list
+		{
+			TIF(currentFrame->GetDirectAllocator()->Reset());
+
+			cl.Prepare(currentFrame->GetDirectAllocator(), sc.GetCurrentRenderTarget());
+
+			cl->OMSetRenderTargets(
+				1, &sc.GetCurrentDescriptor(), true, &ds.GetCPUDescriptorHandleForHeapStart());
+			ds.Clear(cl.GetPtr());
+
+			cl->ClearRenderTargetView(sc.GetCurrentDescriptor(), (float*)&clear_color, 0, NULL);
+
+			cl->SetGraphicsRootSignature(pRootGraphics.Get());
+
+			cl->SetGraphicsRoot32BitConstants(
+				1, 16, reinterpret_cast<LPCVOID>(&(camera.getView() * camera.getProjection())), 0);
+
+			cl->SetGraphicsRootShaderResourceView(2, gTPosBuffer[frameIndex]->GetGPUVirtualAddress());
+
+			cl->RSSetViewports(1, &vp);
+			cl->RSSetScissorRects(1, &scissor);
+
+			// Draw cube
+			cl->SetPipelineState(gps.GetPtr());
+			cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
+
+			gRenderTimer.start(cl.GetPtr(), 0);
+			cl->DrawInstanced(boxBuffer.GetVertexCount(), cbData[frameIndex].numCubes, 0, 0);
+
+			// Draw Grid
+			//grid.Draw(cl.GetPtr());
+
+			ImguiDraw(cl.GetPtr());
+
+			ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
+			cl->SetDescriptorHeaps(1, ppHeaps);
+
+			ImGui::Render();
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
+
+			gRenderTimer.stop(cl.GetPtr(), 0);
+			gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
+
+			cl.Finish();
+		}
 
 		CommandQueue.SubmitList(cl.GetPtr());
 		CommandQueue.Execute();
@@ -569,10 +573,10 @@ int main(int, char**)
 			 1000000000.0f;
 		preTime = currentTime;
 	}
-	#if MULTITHREAD == 1
+#if MULTITHREAD == 1
 	SetEvent(gTWaitComputeEvent[0]);
 	SetEvent(gTWaitComputeEvent[1]);
-	#endif
+#endif
 	InterlockedExchange(&gThreadsRunning, 0L);
 	WaitForSingleObject(gThreadHandles[COMPUTE], INFINITE);
 	WaitForSingleObject(gThreadHandles[COPY], INFINITE);
@@ -810,6 +814,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 		desc.NodeMask				  = 0;
 		desc.Priority				  = 0;
 
+		gDescriptorStride = gDescriptorSize*2;
 		for(UINT frameIndex = 0; frameIndex < gThreadPerBackBuffer; frameIndex++)
 		{
 			TIF(_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gTCopyQueue[frameIndex])));
@@ -848,11 +853,20 @@ void CreateThreads(ID3D12Device* _pDevice)
 												  &bufferDesc,
 												  D3D12_RESOURCE_STATE_COMMON,
 												  nullptr,
-												  IID_PPV_ARGS(&gTPosBuffer)));
-			//NAME_D3D12_OBJECT_INDEXED(gTPosBuffer, frameIndex);
+												  IID_PPV_ARGS(&gTPosBuffer[frameIndex])));
+			NAME_D3D12_OBJECT_INDEXED(gTPosBuffer, frameIndex);
+
+			//TIF(_pDevice->CreateCommittedResource(&defaultHeap,
+			//									  D3D12_HEAP_FLAG_NONE,
+			//									  &bufferDesc,
+			//									  D3D12_RESOURCE_STATE_COMMON,
+			//									  nullptr,
+			//									  IID_PPV_ARGS(&gTPosBufferReadOnly)));
+			////NAME_D3D12_OBJECT_INDEXED(gTPosBuffer, frameIndex);
+			//NAME_D3D12_OBJECT(gTPosBufferReadOnly);
 
 			D3D12_CPU_DESCRIPTOR_HANDLE heapPointer = g_Heap->GetCPUDescriptorHandleForHeapStart();
-			heapPointer.ptr += frameIndex * gDescriptorSize;
+			heapPointer.ptr += frameIndex * gDescriptorStride;
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 			srvDesc.Buffer.FirstElement				= 0;
@@ -863,7 +877,8 @@ void CreateThreads(ID3D12Device* _pDevice)
 			srvDesc.Format							= DXGI_FORMAT_UNKNOWN;
 			srvDesc.ViewDimension					= D3D12_SRV_DIMENSION_BUFFER;
 
-			_pDevice->CreateShaderResourceView(gTPosBuffer.Get(), &srvDesc, heapPointer);
+			//_pDevice->CreateShaderResourceView(gTPosBufferReadOnly.Get(), &srvDesc, heapPointer);
+			_pDevice->CreateShaderResourceView(gTPosBuffer[frameIndex].Get(), &srvDesc, heapPointer);
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.Format							 = DXGI_FORMAT_UNKNOWN;
@@ -875,7 +890,8 @@ void CreateThreads(ID3D12Device* _pDevice)
 			uavDesc.Buffer.Flags					 = D3D12_BUFFER_UAV_FLAG_NONE;
 
 			heapPointer.ptr += gDescriptorSize;
-			_pDevice->CreateUnorderedAccessView(gTPosBuffer.Get(), nullptr, &uavDesc, heapPointer);
+			_pDevice->CreateUnorderedAccessView(
+				gTPosBuffer[frameIndex].Get(), nullptr, &uavDesc, heapPointer);
 
 			// Get the layouts
 			UINT nRows;
@@ -885,7 +901,6 @@ void CreateThreads(ID3D12Device* _pDevice)
 				&bufferDesc, 0, 1, 0, &gTLayouts, &nRows, &rowSizeBytes, &requiredSize);
 
 			gTEvent[COPY][frameIndex] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-			break;
 		}
 
 		/*	gThreadIndexes[COPY] = 0;
@@ -925,12 +940,12 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
-			pCopyList->CopyBufferRegion(gTPosBuffer.Get(),
+			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
 										inArrayOffset,
 										gTCopyUpload[backbufferIndex].Get(),
 										GPUBufferOffset,
 										dataSizeInBytes);
-
+			#if 0
 			D3D12_RESOURCE_BARRIER barrier = {};
 			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 			barrier.Transition.pResource   = gTPosBuffer.Get();
@@ -938,7 +953,9 @@ void CreateThreads(ID3D12Device* _pDevice)
 			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
-			//pCopyList->ResourceBarrier(1, &barrier);
+			pCopyList->ResourceBarrier(1, &barrier);
+			#endif // 0
+
 
 			TIF(pCopyList->Close());
 
@@ -957,7 +974,6 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			TIF(pCopyAllocator->Reset());
 			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
-			break;
 		}
 	}
 
@@ -999,8 +1015,8 @@ void CreateThreads(ID3D12Device* _pDevice)
 		gTWaitComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		gTWaitComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
-		gTStartComputeEvent[0]  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-		gTStartComputeEvent[1]  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		gTStartComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		gTStartComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 		gThreadIndexes[COMPUTE] = threadIndex;
 
@@ -1033,12 +1049,12 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 		PIXBeginEvent(pComputeQueue, 0, L"Compute");
 
 		// wait until render is finished
-	#if MULTITHREAD == 1
+#if MULTITHREAD == 1
 		WaitForSingleObject(gTWaitComputeEvent[backbufferIndex], INFINITE);
 
 		// When waiting done, we set this to waiting state
 		ResetEvent(gTWaitComputeEvent[backbufferIndex]);
-	#endif
+#endif
 
 		// Fill compute list
 		{
@@ -1047,7 +1063,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			D3D12_RESOURCE_BARRIER srvToUav = {};
 			srvToUav.Type					= D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			srvToUav.Transition.pResource   = gTPosBuffer.Get();
+			srvToUav.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
 			srvToUav.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 			srvToUav.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 			srvToUav.Flags					= D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -1060,10 +1076,11 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			D3D12_GPU_DESCRIPTOR_HANDLE heapPtr = g_Heap->GetGPUDescriptorHandleForHeapStart();
 
-			heapPtr.ptr += backbufferIndex * gDescriptorSize;
+			heapPtr.ptr += (1-backbufferIndex) * gDescriptorStride;
 			pComputeList->SetComputeRootDescriptorTable(ROOT_TABLE_SRV, heapPtr);
 
-			heapPtr.ptr += gDescriptorSize;
+			heapPtr = g_Heap->GetGPUDescriptorHandleForHeapStart();
+			heapPtr.ptr += (backbufferIndex * gDescriptorStride) + gDescriptorSize;
 			pComputeList->SetComputeRootDescriptorTable(ROOT_TABLE_UAV, heapPtr);
 
 			pComputeList->SetComputeRoot32BitConstants(2, 5, reinterpret_cast<LPCVOID>(&cbData), 0);
@@ -1079,11 +1096,11 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			TIF(pComputeList->Close());
 		}
-	
-		#if MULTITHREAD == 1
+
+#if MULTITHREAD == 1
 		// Message that the recording is finished
 		SetEvent(gTStartComputeEvent[backbufferIndex]);
-		#endif
+#endif
 		PIXEndEvent(pComputeQueue);
 
 		backbufferIndex++;
@@ -1146,7 +1163,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 		gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
-		pCopyList->CopyBufferRegion(gTPosBuffer.Get(),
+		/*pCopyList->CopyBufferRegion(gTPosBuffer.Get(),
 									inArrayOffset,
 									gTCopyUpload[backbufferIndex].Get(),
 									GPUBufferOffset,
@@ -1157,7 +1174,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 		barrier.Transition.pResource   = gTPosBuffer.Get();
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 		barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-		barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;*/
 
 		//pCopyList->ResourceBarrier(1, &barrier);
 
