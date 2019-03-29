@@ -20,10 +20,10 @@
 #include <Core/Input/Input.h>
 #include <strsafe.h>
 
-#define MULTITHREAD 1
+#define MULTITHREAD 0
 static const bool gMultithread = MULTITHREAD;
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
-ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+ImVec4 clear_color = ImVec4(0.15f, 0.15f, 0.20f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
 void CreateRootGraphics(Device& device, Microsoft::WRL::ComPtr<ID3D12RootSignature>& pRootGraphics);
 void CreateRootCompute(Device& device);
@@ -295,7 +295,7 @@ int main(int, char**)
 	NAME_D3D12_OBJECT(g_Heap);
 
 	constexpr UINT blockSize = 128;
-	CreateParticleFormation(ParticleFormation::Sphere, gPositions, gTotalNumCubes, blockSize);
+	CreateParticleFormation(ParticleFormation::Wormhole, gPositions, gTotalNumCubes, blockSize);
 
 	//Create Upload Heap for all the transfers
 
@@ -349,7 +349,6 @@ int main(int, char**)
 	static float m_particleGenTimer							   = 0;
 	const double UPDATE_TIME								   = 1.0 / 60.0;
 	static float dt											   = 1 / 60;
-	static float lastDt										   = dt;
 	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
 	std::chrono::time_point<std::chrono::steady_clock> currentTime =
 		std::chrono::steady_clock::now();
@@ -363,11 +362,10 @@ int main(int, char**)
 
 	vRam							 = VRamUsage();
 	bool particlesIncreased			 = false;
-	constexpr float particleInterval = 0.05;
+	constexpr float particleInterval = 0.1;
 	UINT lastFrameIndexHit			 = 0;
 	CreateThreads(device.GetDevice());
-	/*currentFrame = fm.GetReadyFrame(&sc);
-	fm.m_iFrameIndex = 0;*/
+
 	cl->Close();
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
@@ -457,7 +455,9 @@ int main(int, char**)
 		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
 
 		// Start the compute thread
+#if MULTITHREAD == 1
 		SetEvent(gTWaitComputeEvent[frameIndex]);
+#endif
 
 		//Fill command list
 		{
@@ -492,7 +492,7 @@ int main(int, char**)
 			// Draw Grid
 			//grid.Draw(cl.GetPtr());
 
-			ImguiDraw(cl.GetPtr());
+			//ImguiDraw(cl.GetPtr());
 
 			ID3D12DescriptorHeap* ppHeaps[] = {g_imguiSRVHeap.Get()};
 			cl->SetDescriptorHeaps(1, ppHeaps);
@@ -507,10 +507,12 @@ int main(int, char**)
 		}
 		
 		// Wait for the compute thread to finish recording
+		#if MULTITHREAD == 1
 		WaitForSingleObject(gTStartComputeEvent[frameIndex], INFINITE);
-
+		
 
 		ResetEvent(gTStartComputeEvent[frameIndex]);
+		#endif
 		// Execute
 		ID3D12CommandList* Lists[] = {gTComputeList.Get()};
 		gTComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
@@ -560,24 +562,17 @@ int main(int, char**)
 
 			UINT64 dtQ	 = drawTime.Stop - drawTime.Start;
 			renderTimeInMs = dtQ * timestampToMs;
-
-			//cbData[frameIndex].dt = dt / 10;
-			/*if(lastFrameIndexHit != frameIndex && particlesIncreased)
-		{
-			cbData[frameIndex].numCubes += 128;
-			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
-			particlesIncreased			 = false;
-		}*/
 		}
 
 		currentTime = std::chrono::steady_clock::now();
-		lastDt		= dt;
 		dt = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTime - preTime).count() /
 			 1000000000.0f;
 		preTime = currentTime;
 	}
+	#if MULTITHREAD == 1
 	SetEvent(gTWaitComputeEvent[0]);
 	SetEvent(gTWaitComputeEvent[1]);
+	#endif
 	InterlockedExchange(&gThreadsRunning, 0L);
 	WaitForSingleObject(gThreadHandles[COMPUTE], INFINITE);
 	WaitForSingleObject(gThreadHandles[COPY], INFINITE);
@@ -1000,7 +995,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 			gTEvent[COMPUTE][0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		}
-
+#if MULTITHREAD == 1
 		gTWaitComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		gTWaitComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
@@ -1008,7 +1003,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 		gTStartComputeEvent[1]  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 		gThreadIndexes[COMPUTE] = threadIndex;
-#if MULTITHREAD == 1
+
 		gThreadHandles[COMPUTE] = CreateThread(nullptr,
 											   0,
 											   ComputeThreadProc,
@@ -1038,11 +1033,12 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 		PIXBeginEvent(pComputeQueue, 0, L"Compute");
 
 		// wait until render is finished
+	#if MULTITHREAD == 1
 		WaitForSingleObject(gTWaitComputeEvent[backbufferIndex], INFINITE);
 
 		// When waiting done, we set this to waiting state
 		ResetEvent(gTWaitComputeEvent[backbufferIndex]);
-	
+	#endif
 
 		// Fill compute list
 		{
@@ -1084,10 +1080,10 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 			TIF(pComputeList->Close());
 		}
 	
-
+		#if MULTITHREAD == 1
 		// Message that the recording is finished
 		SetEvent(gTStartComputeEvent[backbufferIndex]);
-
+		#endif
 		PIXEndEvent(pComputeQueue);
 
 		backbufferIndex++;
