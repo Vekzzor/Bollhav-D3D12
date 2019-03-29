@@ -459,15 +459,17 @@ int main(int, char**)
 			perfDataIndex++;*/
 		}
 
+		// Start Copy Thread
 		SetEvent(gTWaitCopyEvent);
 
+		// Wait until command recording is done.
 		WaitForSingleObject(gTStartCopyEvent, INFINITE);
 		ResetEvent(gTStartCopyEvent);
 
 		// Execute
 		ID3D12CommandList* CLists[] = {gTCopyList[frameIndex].Get()};
 		gTCopyQueue->ExecuteCommandLists(ARRAYSIZE(CLists), CLists);
-		UINT64 copyFenceValue = gTCopyFenceValue + 1;
+		UINT64 copyFenceValue = ++gTCopyFenceValue;
 		gTCopyQueue->Signal(gTCopyFence.Get(), copyFenceValue);
 
 #if MULTITHREAD == 0
@@ -486,14 +488,14 @@ int main(int, char**)
 		ResetEvent(gTStartComputeEvent);
 #endif
 
-		gTComputeQueue->Wait(gTComputeFence.Get(), gTCopyFenceValue);
+		gTComputeQueue->Wait(gTCopyFence.Get(), gTCopyFenceValue);
 		// Execute
 		ID3D12CommandList* Lists[] = {gTComputeList[frameIndex].Get()};
 		gTComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
 
 		// Wait for the compute to finish.
 		{
-			UINT64 threadFenceValue = gTComputeFenceValue + 1;
+			UINT64 threadFenceValue = ++gTComputeFenceValue;
 			TIF(gTComputeQueue->Signal(gTComputeFence.Get(), threadFenceValue));
 		}
 
@@ -1044,7 +1046,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
 #endif
 	unsigned int backbufferIndex = 0;
-	static UINT lastIndex		 = NUM_BACKBUFFERS - 1;
+	UINT lastIndex				 = NUM_BACKBUFFERS - 1;
 	do
 	{
 		ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[backbufferIndex].Get();
@@ -1072,13 +1074,22 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			pComputeList->ResourceBarrier(1, &srvToUav);
 
+			D3D12_RESOURCE_BARRIER copyToSrv = {};
+			copyToSrv.Type					 = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			copyToSrv.Transition.pResource   = gTPosBuffer[lastIndex].Get();
+			copyToSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+			copyToSrv.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			copyToSrv.Flags					 = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+			pComputeList->ResourceBarrier(1, &copyToSrv);
+
 			pComputeList->SetComputeRootSignature(gRootCompute.Get());
 			ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
 			pComputeList->SetDescriptorHeaps(_countof(ppHeaps2), ppHeaps2);
 
 			D3D12_GPU_DESCRIPTOR_HANDLE heapPtr = g_Heap->GetGPUDescriptorHandleForHeapStart();
 
-			heapPtr.ptr += (lastIndex)*gDescriptorStride;
+			heapPtr.ptr += lastIndex * gDescriptorStride;
 			pComputeList->SetComputeRootDescriptorTable(ROOT_TABLE_SRV, heapPtr);
 
 			heapPtr = g_Heap->GetGPUDescriptorHandleForHeapStart();
@@ -1145,7 +1156,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 			UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
 
 			BYTE* pData;
-			TIF(gTCopyUpload[backbufferIndex]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+			TIF(gTCopyUpload[0]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
 
 			// Offset the pointer
 			pData += GPUBufferOffset;
@@ -1154,12 +1165,12 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 			memcpy(pData, inArrayStart, dataSizeInBytes);
 
-			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
+			gTCopyUpload[0]->Unmap(0, nullptr);
 
 			D3D12_RESOURCE_BARRIER barrier = {};
 			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 			barrier.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
 			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
 			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
@@ -1167,14 +1178,14 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
 										inArrayOffset,
-										gTCopyUpload[backbufferIndex].Get(),
+										gTCopyUpload[0].Get(),
 										GPUBufferOffset,
 										dataSizeInBytes);
 
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-			pCopyList->ResourceBarrier(1, &barrier);
+			//pCopyList->ResourceBarrier(1, &barrier);
 
 			TIF(pCopyList->Close());
 		}
