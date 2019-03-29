@@ -151,14 +151,14 @@ ComPtr<ID3D12CommandQueue> gTComputeQueue;
 ComPtr<ID3D12CommandAllocator> gTComputeAllocator[gThreadPerBackBuffer];
 ComPtr<ID3D12GraphicsCommandList> gTComputeList[gThreadPerBackBuffer];
 
-ComPtr<ID3D12Fence> gTComputeFence[NUM_BACKBUFFERS];
-volatile UINT64 gTComputeFenceValue[NUM_BACKBUFFERS];
+ComPtr<ID3D12Fence> gTComputeFence;
+UINT64 gTComputeFenceValue;
 
 // Per Copy Queue
 
 DWORD WINAPI CopyThreadProc(LPVOID _pThreadData);
 
-ComPtr<ID3D12CommandQueue> gTCopyQueue[gThreadPerBackBuffer];
+ComPtr<ID3D12CommandQueue> gTCopyQueue;
 ComPtr<ID3D12CommandAllocator> gTCopyAllocator[gThreadPerBackBuffer];
 ComPtr<ID3D12GraphicsCommandList> gTCopyList[gThreadPerBackBuffer];
 
@@ -166,13 +166,16 @@ D3D12_PLACED_SUBRESOURCE_FOOTPRINT gTLayouts;
 ComPtr<ID3D12Resource> gTCopyUpload[gThreadPerBackBuffer];
 ComPtr<ID3D12Resource> gTPosBuffer[gThreadPerBackBuffer];
 
-ComPtr<ID3D12Fence> gTCopyFence[gThreadPerBackBuffer];
-volatile UINT64 gTCopyFenceValue[gThreadPerBackBuffer];
+ComPtr<ID3D12Fence> gTCopyFence;
+UINT64 gTCopyFenceValue;
 
 HANDLE gTEvent[THREAD_TYPE_COUNT][gThreadPerBackBuffer];
 
-HANDLE gTStartComputeEvent[gThreadPerBackBuffer];
-HANDLE gTWaitComputeEvent[gThreadPerBackBuffer];
+HANDLE gTStartComputeEvent;
+HANDLE gTWaitComputeEvent;
+
+HANDLE gTWaitCopyEvent;
+HANDLE gTStartCopyEvent;
 
 ComPtr<ID3D12Fence> gTRenderFence[gThreadPerBackBuffer];
 volatile UINT64 gTRenderFenceValue[gThreadPerBackBuffer];
@@ -370,6 +373,8 @@ int main(int, char**)
 	CreateThreads(device.GetDevice());
 
 	cl->Close();
+
+	UINT cbIndex = NUM_BACKBUFFERS - 1;
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
 		m_timer += dt;
@@ -430,59 +435,66 @@ int main(int, char**)
 		}
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue) % NUM_BACKBUFFERS;
 
-		cbData[frameIndex].dt	 = dt / 10;
-		cbData[(NUM_BACKBUFFERS - 1) - frameIndex].dt = cbData[frameIndex].dt;
+		cbData[frameIndex].dt = dt / 10;
+		cbData[cbIndex].dt	= cbData[frameIndex].dt;
 		if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
 		{
 			m_time += m_particleGenTimer;
 			//lastFrameIndexHit			 = frameIndex;
-			cbData[frameIndex].numCubes /*= gNumCubesCount[frameIndex]*/ += 128;
-			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
-			cbData[(NUM_BACKBUFFERS - 1) - frameIndex].numCubes /*= gNumCubesCount[1 - frameIndex]*/
-				+= 128;
-			cbData[(NUM_BACKBUFFERS - 1) - frameIndex].numBlocks =
-				ceil(cbData[(NUM_BACKBUFFERS - 1) - frameIndex].numCubes / 128);
+			//cbData[frameIndex].numCubes /*= gNumCubesCount[frameIndex]*/ += 128;
+			//cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
+			cbData[cbIndex].numCubes += 128;
+			cbData[cbIndex].numBlocks = ceil(cbData[cbIndex].numCubes / 128);
 			m_particleGenTimer -= particleInterval;
 
-			particleAmount								 = cbData[frameIndex].numCubes;
+			cbIndex++;
+			cbIndex = cbIndex & NUM_BACKBUFFERS;
+
+			/*		particleAmount								 = cbData[frameIndex].numCubes;
 			perfData[perfDataIndex].currentTime			 = m_time;
 			perfData[perfDataIndex].particleCount		 = cbData[frameIndex].numCubes;
 			perfData[perfDataIndex - 1].DrawDuration	 = renderTimeInMs;
 			perfData[perfDataIndex - 1].DispatchDuration = computeTimeInMs;
 			perfData[perfDataIndex - 1].FrameTime		 = 1000.0f / ImGui::GetIO().Framerate;
-			perfDataIndex++;
+			perfDataIndex++;*/
 		}
+
+		SetEvent(gTWaitCopyEvent);
+
+		WaitForSingleObject(gTStartCopyEvent, INFINITE);
+		ResetEvent(gTStartCopyEvent);
+
+		// Execute
+		ID3D12CommandList* CLists[] = {gTCopyList[frameIndex].Get()};
+		gTCopyQueue->ExecuteCommandLists(ARRAYSIZE(CLists), CLists);
+		UINT64 copyFenceValue = gTCopyFenceValue + 1;
+		gTCopyQueue->Signal(gTCopyFence.Get(), copyFenceValue);
+
 #if MULTITHREAD == 0
 		ComputeThreadProc(nullptr);
 #endif
 
-		// Rendering
-		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
-
 		// Start the compute thread
 #if MULTITHREAD == 1
-		SetEvent(gTWaitComputeEvent[frameIndex]);
+		SetEvent(gTWaitComputeEvent);
 #endif
 
 // Wait for the compute thread to finish recording
 #if MULTITHREAD == 1
-		WaitForSingleObject(gTStartComputeEvent[frameIndex], INFINITE);
+		WaitForSingleObject(gTStartComputeEvent, INFINITE);
 
-		ResetEvent(gTStartComputeEvent[frameIndex]);
+		ResetEvent(gTStartComputeEvent);
 #endif
+
+		gTComputeQueue->Wait(gTComputeFence.Get(), gTCopyFenceValue);
 		// Execute
 		ID3D12CommandList* Lists[] = {gTComputeList[frameIndex].Get()};
 		gTComputeQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
 
 		// Wait for the compute to finish.
 		{
-			UINT64 threadFenceValue = InterlockedIncrement(&gTComputeFenceValue[frameIndex]);
-			TIF(gTComputeQueue->Signal(gTComputeFence[frameIndex].Get(), threadFenceValue));
-
-			/*TIF(gTComputeFence[frameIndex]->SetEventOnCompletion(threadFenceValue,
-																 gTEvent[COMPUTE][frameIndex]));*/
-
-			//WaitForSingleObject(gTEvent[COMPUTE][frameIndex], INFINITE);
+			UINT64 threadFenceValue = gTComputeFenceValue + 1;
+			TIF(gTComputeQueue->Signal(gTComputeFence.Get(), threadFenceValue));
 		}
 
 		//Fill command list
@@ -513,7 +525,7 @@ int main(int, char**)
 			cl->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			cl->IASetVertexBuffers(0, 1, &boxBuffer.GetVertexView());
 
-		//	gRenderTimer.start(cl.GetPtr(), 0);
+			//	gRenderTimer.start(cl.GetPtr(), 0);
 			cl->DrawInstanced(boxBuffer.GetVertexCount(), cbData[frameIndex].numCubes, 0, 0);
 
 			// Draw Grid
@@ -527,14 +539,16 @@ int main(int, char**)
 			ImGui::Render();
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cl.GetPtr());
 
-		//	gRenderTimer.stop(cl.GetPtr(), 0);
-		//	gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
+			//	gRenderTimer.stop(cl.GetPtr(), 0);
+			//	gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
 
 			cl.Finish();
 		}
+		// Rendering
+		PIXBeginEvent(CommandQueue.GetCommandQueue(), 0, L"DirectQueue");
 
 		CommandQueue.SubmitList(cl.GetPtr());
-		CommandQueue->Wait(gTComputeFence[frameIndex].Get(), gTComputeFenceValue[frameIndex]);
+		CommandQueue->Wait(gTComputeFence.Get(), gTComputeFenceValue);
 		CommandQueue.Execute();
 		PIXEndEvent(CommandQueue.GetCommandQueue());
 
@@ -576,8 +590,7 @@ int main(int, char**)
 		preTime = currentTime;
 	}
 #if MULTITHREAD == 1
-	SetEvent(gTWaitComputeEvent[0]);
-	SetEvent(gTWaitComputeEvent[1]);
+	SetEvent(gTWaitComputeEvent);
 #endif
 	InterlockedExchange(&gThreadsRunning, 0L);
 	WaitForSingleObject(gThreadHandles[COMPUTE], INFINITE);
@@ -817,11 +830,19 @@ void CreateThreads(ID3D12Device* _pDevice)
 		desc.NodeMask				  = 0;
 		desc.Priority				  = 0;
 
+		TIF(_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gTCopyQueue)));
+		NAME_D3D12_OBJECT(gTCopyQueue);
+
+		// NOTE(Henrik): Check on the shared flag
+		gTCopyFenceValue = 0;
+
+		TIF(_pDevice->CreateFence(
+			gTCopyFenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gTCopyFence)));
+
+		NAME_D3D12_OBJECT(gTCopyFence);
+
 		for(UINT frameIndex = 0; frameIndex < gThreadPerBackBuffer; frameIndex++)
 		{
-			TIF(_pDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&gTCopyQueue[frameIndex])));
-			NAME_D3D12_OBJECT_INDEXED(gTCopyQueue, frameIndex);
-
 			TIF(_pDevice->CreateCommandAllocator(desc.Type,
 												 IID_PPV_ARGS(&gTCopyAllocator[frameIndex])));
 			NAME_D3D12_OBJECT_INDEXED(gTCopyAllocator, frameIndex);
@@ -833,13 +854,7 @@ void CreateThreads(ID3D12Device* _pDevice)
 											IID_PPV_ARGS(&gTCopyList[frameIndex])));
 			NAME_D3D12_OBJECT_INDEXED(gTCopyList, frameIndex);
 
-			// NOTE(Henrik): Check on the shared flag
-			InterlockedExchange(&gTCopyFenceValue[frameIndex], frameIndex);
-
-			TIF(_pDevice->CreateFence(
-				frameIndex, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&gTCopyFence[frameIndex])));
-
-			NAME_D3D12_OBJECT_INDEXED(gTCopyFence, frameIndex);
+			gTCopyList[frameIndex]->Close();
 
 			// Create upload buffer
 			TIF(_pDevice->CreateCommittedResource(&uploadHeap,
@@ -896,7 +911,10 @@ void CreateThreads(ID3D12Device* _pDevice)
 			gTEvent[COPY][frameIndex] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		}
 
-		/*	gThreadIndexes[COPY] = 0;
+		gTWaitCopyEvent  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+		gTStartCopyEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+		gThreadIndexes[COPY] = 0;
 		gThreadHandles[COPY] = CreateThread(nullptr,
 											0,
 											CopyThreadProc,
@@ -905,68 +923,70 @@ void CreateThreads(ID3D12Device* _pDevice)
 											nullptr);
 
 		ResumeThread(gThreadHandles[COPY]);
-*/
-		for(unsigned backbufferIndex = 0; backbufferIndex < gThreadPerBackBuffer; backbufferIndex++)
-		{
 
-			ID3D12CommandQueue* pCopyQueue		   = gTCopyQueue[backbufferIndex].Get();
-			ID3D12CommandAllocator* pCopyAllocator = gTCopyAllocator[backbufferIndex].Get();
-			ID3D12GraphicsCommandList* pCopyList   = gTCopyList[backbufferIndex].Get();
-			ID3D12Fence* pCopyFence				   = gTCopyFence[backbufferIndex].Get();
+		// NO MORE COPYING
 
-			PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
-
-			// Do the copying!
-			UINT dataSizeInBytes = sizeof(gPositions);
-			UINT64 inArrayOffset = 0;
-			UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
-
-			BYTE* pData;
-			TIF(gTCopyUpload[backbufferIndex]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
-
-			// Offset the pointer
-			pData += GPUBufferOffset;
-
-			BYTE* inArrayStart = reinterpret_cast<BYTE*>(&gPositions) + inArrayOffset;
-
-			memcpy(pData, inArrayStart, dataSizeInBytes);
-
-			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
-
-			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
-										inArrayOffset,
-										gTCopyUpload[backbufferIndex].Get(),
-										GPUBufferOffset,
-										dataSizeInBytes);
-#if 0
-			D3D12_RESOURCE_BARRIER barrier = {};
-			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Transition.pResource   = gTPosBuffer.Get();
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-			pCopyList->ResourceBarrier(1, &barrier);
-#endif // 0
-
-			TIF(pCopyList->Close());
-
-			// Execute
-			ID3D12CommandList* Lists[] = {pCopyList};
-			pCopyQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
-
-			// Wait for the copy to finish
-			UINT64 threadFenceValue = InterlockedIncrement(&gTCopyFenceValue[backbufferIndex]);
-			TIF(pCopyQueue->Signal(pCopyFence, threadFenceValue));
-
-			TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
-			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
-
-			PIXEndEvent(pCopyQueue);
-
-			TIF(pCopyAllocator->Reset());
-			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
-		}
+		//		for(unsigned backbufferIndex = 0; backbufferIndex < gThreadPerBackBuffer; backbufferIndex++)
+		//		{
+		//
+		//			ID3D12CommandQueue* pCopyQueue		   = gTCopyQueue.Get();
+		//			ID3D12CommandAllocator* pCopyAllocator = gTCopyAllocator[backbufferIndex].Get();
+		//			ID3D12GraphicsCommandList* pCopyList   = gTCopyList[backbufferIndex].Get();
+		//			ID3D12Fence* pCopyFence				   = gTCopyFence.Get();
+		//
+		//			PIXBeginEvent(pCopyQueue, 0, L"CopyQueue");
+		//
+		//			// Do the copying!
+		//			UINT dataSizeInBytes = sizeof(gPositions);
+		//			UINT64 inArrayOffset = 0;
+		//			UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
+		//
+		//			BYTE* pData;
+		//			TIF(gTCopyUpload[backbufferIndex]->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
+		//
+		//			// Offset the pointer
+		//			pData += GPUBufferOffset;
+		//
+		//			BYTE* inArrayStart = reinterpret_cast<BYTE*>(&gPositions) + inArrayOffset;
+		//
+		//			memcpy(pData, inArrayStart, dataSizeInBytes);
+		//
+		//			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
+		//
+		//			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
+		//										inArrayOffset,
+		//										gTCopyUpload[backbufferIndex].Get(),
+		//										GPUBufferOffset,
+		//										dataSizeInBytes);
+		//#if 0
+		//			D3D12_RESOURCE_BARRIER barrier = {};
+		//			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		//			barrier.Transition.pResource   = gTPosBuffer.Get();
+		//			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+		//			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		//			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		//
+		//			pCopyList->ResourceBarrier(1, &barrier);
+		//#endif // 0
+		//
+		//			TIF(pCopyList->Close());
+		//
+		//			// Execute
+		//			ID3D12CommandList* Lists[] = {pCopyList};
+		//			pCopyQueue->ExecuteCommandLists(ARRAYSIZE(Lists), Lists);
+		//
+		//			// Wait for the copy to finish
+		//			UINT64 threadFenceValue = gTCopyFenceValue + 1;
+		//			TIF(pCopyQueue->Signal(pCopyFence, threadFenceValue));
+		//
+		//			TIF(pCopyFence->SetEventOnCompletion(threadFenceValue, gTEvent[COPY][backbufferIndex]));
+		//			WaitForSingleObject(gTEvent[COPY][backbufferIndex], INFINITE);
+		//
+		//			PIXEndEvent(pCopyQueue);
+		//
+		//			TIF(pCopyAllocator->Reset());
+		//			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
+		//		}
 	}
 
 	// Create the Compute threads
@@ -990,37 +1010,32 @@ void CreateThreads(ID3D12Device* _pDevice)
 									gComputePipeline.Get(),
 									IID_PPV_ARGS(&gTComputeList[threadIndex]));
 
-		NAME_D3D12_OBJECT_INDEXED(gTComputeList,threadIndex);
+		NAME_D3D12_OBJECT_INDEXED(gTComputeList, threadIndex);
 
 		gTComputeList[threadIndex]->Close();
-		gTComputeFenceValue[threadIndex] = 0;
-		_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gTComputeFence[threadIndex]));
-		NAME_D3D12_OBJECT_INDEXED(gTComputeFence, threadIndex);
+		gTComputeFenceValue = 0;
+		_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gTComputeFence));
+		NAME_D3D12_OBJECT(gTComputeFence, threadIndex);
 	}
-	// NOTE(Henrik): Check on the shared flag
-
-	
 
 	gTEvent[COMPUTE][0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
-	#if MULTITHREAD == 1
-	gTWaitComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	gTWaitComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+#if MULTITHREAD == 1
+	gTWaitComputeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
-	gTStartComputeEvent[0] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	gTStartComputeEvent[1] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	gTStartComputeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 	gThreadIndexes[COMPUTE] = 0;
 
 	gThreadHandles[COMPUTE] = CreateThread(nullptr,
-									   0,
-									   ComputeThreadProc,
-									   reinterpret_cast<LPVOID>(&gThreadIndexes[COMPUTE]),
-									   CREATE_SUSPENDED,
-									   nullptr);
+										   0,
+										   ComputeThreadProc,
+										   reinterpret_cast<LPVOID>(&gThreadIndexes[COMPUTE]),
+										   CREATE_SUSPENDED,
+										   nullptr);
 
 	ResumeThread(gThreadHandles[COMPUTE]);
-	#endif
+#endif
 }
 
 DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
@@ -1029,19 +1044,18 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
 #endif
 	unsigned int backbufferIndex = 0;
-	static UINT lastIndex		 = NUM_BACKBUFFERS-1;
+	static UINT lastIndex		 = NUM_BACKBUFFERS - 1;
 	do
 	{
 		ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[backbufferIndex].Get();
 		ID3D12GraphicsCommandList* pComputeList   = gTComputeList[backbufferIndex].Get();
 
-
 		// wait until render is finished
 #if MULTITHREAD == 1
-		WaitForSingleObject(gTWaitComputeEvent[backbufferIndex], INFINITE);
+		WaitForSingleObject(gTWaitComputeEvent, INFINITE);
 
 		// When waiting done, we set this to waiting state
-		ResetEvent(gTWaitComputeEvent[backbufferIndex]);
+		ResetEvent(gTWaitComputeEvent);
 #endif
 
 		// Fill compute list
@@ -1087,7 +1101,7 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 #if MULTITHREAD == 1
 		// Message that the recording is finished
-		SetEvent(gTStartComputeEvent[backbufferIndex]);
+		SetEvent(gTStartComputeEvent);
 #endif
 
 		backbufferIndex++;
@@ -1105,29 +1119,29 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 #if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
 #endif
-	unsigned int backbufferIndex = 0;
-	static UINT lastIndex		 = NUM_BACKBUFFERS - 1;
+	unsigned int backbufferIndex = NUM_BACKBUFFERS - 1;
 	do
 	{
 		ID3D12CommandAllocator* pCopyAllocator = gTCopyAllocator[backbufferIndex].Get();
 		ID3D12GraphicsCommandList* pCopyList   = gTCopyList[backbufferIndex].Get();
 
-		// wait until render is finished
-		#if MULTITHREAD == 1
-		WaitForSingleObject(gTWaitCopyEvent[backbufferIndex], INFINITE);
+// wait until render is finished
+#if MULTITHREAD == 1
+		WaitForSingleObject(gTWaitCopyEvent, INFINITE);
 
 		// When waiting done, we set this to waiting state
-		ResetEvent(gTWaitCopyEvent[backbufferIndex]);
-		#endif
+		ResetEvent(gTWaitCopyEvent);
+#endif
 
-		// Fill compute list
+		// Fill copy list
 		{
 			TIF(pCopyAllocator->Reset());
 			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
 
 			// Do the copying!
-			UINT dataSizeInBytes = sizeof(DATA);
-			UINT64 inArrayOffset = (cbData[backbufferIndex].numCubes - 1) * dataSizeInBytes;
+			UINT dataSizeInBytes = sizeof(DATA) * blockSize;
+			// TODO(Henrik): fixa numcubes
+			UINT64 inArrayOffset = ((cbData[backbufferIndex].numCubes) - blockSize) * sizeof(DATA);
 			UINT GPUBufferOffset = gTLayouts.Offset + inArrayOffset;
 
 			BYTE* pData;
@@ -1142,37 +1156,38 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 
 			gTCopyUpload[backbufferIndex]->Unmap(0, nullptr);
 
-			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
-									inArrayOffset,
-									gTCopyUpload[backbufferIndex].Get(),
-									GPUBufferOffset,
-									dataSizeInBytes);
-
 			D3D12_RESOURCE_BARRIER barrier = {};
 			barrier.Type				   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 			barrier.Transition.pResource   = gTPosBuffer[backbufferIndex].Get();
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
 			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
-			//pCopyList->ResourceBarrier(1, &barrier);
+			pCopyList->ResourceBarrier(1, &barrier);
+
+			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
+										inArrayOffset,
+										gTCopyUpload[backbufferIndex].Get(),
+										GPUBufferOffset,
+										dataSizeInBytes);
+
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+			pCopyList->ResourceBarrier(1, &barrier);
 
 			TIF(pCopyList->Close());
 		}
 
-		#if MULTITHREAD == 1
+#if MULTITHREAD == 1
 		// Message that the recording is finished
-		SetEvent(gTStartCopyEvent[backbufferIndex]);
-		#endif
-
+		SetEvent(gTStartCopyEvent);
+#endif
 		backbufferIndex++;
-		lastIndex++;
-		lastIndex %= NUM_BACKBUFFERS;
 		backbufferIndex %= NUM_BACKBUFFERS;
 	} while(gMultithread && InterlockedCompareExchange(&gThreadsRunning, 0, 0));
 
 	return 0;
-
 }
 #define M_PI 3.14159265358979323846
 #define DEGTORAD(d) d*(M_PI / 180)
