@@ -543,7 +543,15 @@ int main(int, char**)
 
 			//	gRenderTimer.stop(cl.GetPtr(), 0);
 			//	gRenderTimer.resolveQueryToCPU(cl.GetPtr(), 0);
+			
+			D3D12_RESOURCE_BARRIER copyToSrv = {};
+			copyToSrv.Type					 = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			copyToSrv.Transition.pResource   = gTPosBuffer[frameIndex].Get();
+			copyToSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			copyToSrv.Transition.StateAfter  = D3D12_RESOURCE_STATE_COMMON;
+			copyToSrv.Flags					 = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
+			cl->ResourceBarrier(1, &copyToSrv);
 			cl.Finish();
 		}
 		// Rendering
@@ -593,6 +601,7 @@ int main(int, char**)
 	}
 #if MULTITHREAD == 1
 	SetEvent(gTWaitComputeEvent);
+	SetEvent(gTWaitCopyEvent);
 #endif
 	InterlockedExchange(&gThreadsRunning, 0L);
 	WaitForSingleObject(gThreadHandles[COMPUTE], INFINITE);
@@ -1074,14 +1083,6 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			pComputeList->ResourceBarrier(1, &srvToUav);
 
-			D3D12_RESOURCE_BARRIER copyToSrv = {};
-			copyToSrv.Type					 = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			copyToSrv.Transition.pResource   = gTPosBuffer[lastIndex].Get();
-			copyToSrv.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-			copyToSrv.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			copyToSrv.Flags					 = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-
-			pComputeList->ResourceBarrier(1, &copyToSrv);
 
 			pComputeList->SetComputeRootSignature(gRootCompute.Get());
 			ID3D12DescriptorHeap* ppHeaps2[] = {g_Heap.Get()};
@@ -1174,7 +1175,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 			barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
 			barrier.Flags				   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 
-			pCopyList->ResourceBarrier(1, &barrier);
+			//pCopyList->ResourceBarrier(1, &barrier);
 
 			pCopyList->CopyBufferRegion(gTPosBuffer[backbufferIndex].Get(),
 										inArrayOffset,
