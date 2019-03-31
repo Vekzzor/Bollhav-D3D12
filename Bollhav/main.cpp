@@ -21,6 +21,8 @@
 #include <crtdbg.h>
 #include <strsafe.h>
 
+#define MULTI
+
 ComPtr<ID3D12DescriptorHeap> g_imguiSRVHeap;
 ImVec4 clear_color = ImVec4(0.15f, 0.15f, 0.20f, 1.00f);
 void ImguiSetup(ID3D12Device4* _pDevice, HWND _hWindowHandle);
@@ -207,7 +209,7 @@ int main(int, char**)
 		cl = CommandList(device.GetDevice(), currentFrame->GetDirectAllocator());
 		TIF(cl->Close());
 	}
-	
+
 	CopyList copyList(device.GetDevice());
 
 	ImguiSetup(device.GetDevice(), window.getHandle());
@@ -335,7 +337,7 @@ int main(int, char**)
 	static float m_particleGenTimer[NUM_BACKBUFFERS] = {};
 	static float dt									 = 1 / 60;
 	constexpr float particleInterval				 = 0.1f;
-	
+
 	std::chrono::time_point<std::chrono::steady_clock> preTime = std::chrono::steady_clock::now();
 	std::chrono::time_point<std::chrono::steady_clock> currentTime =
 		std::chrono::steady_clock::now();
@@ -347,12 +349,11 @@ int main(int, char**)
 	perfData[perfDataIndex].FrameTime		 = 0;
 	perfDataIndex++;
 
-
 	CreateThreads(device.GetDevice());
 
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
-		vRam				  = VRamUsage();
+		vRam = VRamUsage();
 
 		const UINT frameIndex = (fm.m_fenceLastSignaledValue + 1) % NUM_BACKBUFFERS;
 		m_particleGenTimer[frameIndex] += dt;
@@ -366,7 +367,7 @@ int main(int, char**)
 		// Camera stuff
 		updateCamera(camera, dt);
 
-		for (auto &cb : cbData)
+		for(auto& cb : cbData)
 			cb.dt = dt / 10;
 
 		if(m_particleGenTimer[frameIndex] > particleInterval &&
@@ -433,8 +434,6 @@ int main(int, char**)
 			ImGui::Render();
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cls[frameIndex].GetPtr());
 
-			
-
 			D3D12_RESOURCE_BARRIER copyToSrv = {};
 			copyToSrv.Type					 = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 			copyToSrv.Transition.pResource   = gTPosBuffer[frameIndex].Get();
@@ -445,17 +444,24 @@ int main(int, char**)
 			cls[frameIndex]->ResourceBarrier(1, &copyToSrv);
 			cls[frameIndex].Finish();
 		}
-
+#ifdef MULTI
 		// Start the compute thread
 		SetEvent(gTWaitComputeEvent);
+#else
+		ComputeThreadProc(nullptr);
+#endif
 		// Start Copy Thread
 		if(gCopiedData[frameIndex] < gTotalNumCubes)
 		{
+#ifdef MULTI
 			SetEvent(gTWaitCopyEvent);
-			
 			// Wait until command recording is done.
 			WaitForSingleObject(gTStartCopyEvent, INFINITE);
 			ResetEvent(gTStartCopyEvent);
+#else
+
+			CopyThreadProc(nullptr);
+#endif
 
 			// Execute
 			ID3D12CommandList* CLists[] = {gTCopyList[frameIndex].Get()};
@@ -464,11 +470,12 @@ int main(int, char**)
 			gTCopyQueue->Signal(gTCopyFence.Get(), copyFenceValue);
 		}
 
+#ifdef MULTI
 		// Wait for the compute thread to finish recording
 		WaitForSingleObject(gTStartComputeEvent, INFINITE);
 
 		ResetEvent(gTStartComputeEvent);
-
+#endif
 		gTComputeQueue->Wait(gTCopyFence.Get(), gTCopyFenceValue);
 		// Execute
 		ID3D12CommandList* Lists[] = {gTComputeList[frameIndex].Get()};
@@ -560,7 +567,7 @@ void updateCamera(FPSCamera& camera, float dt)
 	prevMouse = currMousePos;
 	if(Input::IsKeyPressed(VK_LBUTTON))
 	{
-		camera.rotate(-dx * deltaTime*10, -dy * deltaTime*10);
+		camera.rotate(-dx * deltaTime * 10, -dy * deltaTime * 10);
 	}
 
 	float speed = Input::IsKeyPressed(VK_SHIFT) ? 400 : 200;
@@ -878,13 +885,9 @@ void CreateThreads(ID3D12Device* _pDevice)
 
 		gTWaitCopyEvent  = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		gTStartCopyEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-
-		gThreadHandles[COPY] = CreateThread(nullptr,
-											0,
-											CopyThreadProc,
-											nullptr,
-											0,
-											nullptr);
+#ifdef MULTI
+		gThreadHandles[COPY] = CreateThread(nullptr, 0, CopyThreadProc, nullptr, 0, nullptr);
+#endif
 	}
 
 	// Create the Compute threads
@@ -919,30 +922,30 @@ void CreateThreads(ID3D12Device* _pDevice)
 	gTWaitComputeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 	gTStartComputeEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-
-	gThreadHandles[COMPUTE] = CreateThread(nullptr,
-										   0,
-										   ComputeThreadProc,
-										   nullptr,
-										   0,
-										   nullptr);
+#ifdef MULTI
+	gThreadHandles[COMPUTE] = CreateThread(nullptr, 0, ComputeThreadProc, nullptr, 0, nullptr);
+#endif
 }
 
 DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 {
 	UNREFERENCED_PARAMETER(_pThreadData);
-	unsigned int backbufferIndex = 1;
-	UINT lastIndex				 = 0;
+	static unsigned int backbufferIndex = 1;
+	static UINT lastIndex				 = 0;
+#ifdef MULTI
 	do
 	{
+#endif
 		ID3D12CommandAllocator* pComputeAllocator = gTComputeAllocator[backbufferIndex].Get();
 		ID3D12GraphicsCommandList* pComputeList   = gTComputeList[backbufferIndex].Get();
 
+#ifdef MULTI
 		// wait until render is finished
 		WaitForSingleObject(gTWaitComputeEvent, INFINITE);
 
 		// When waiting done, we set this to waiting state
 		ResetEvent(gTWaitComputeEvent);
+#endif
 
 		// Fill compute list
 		{
@@ -984,15 +987,17 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 			TIF(pComputeList->Close());
 		}
-
+#ifdef MULTI
 		// Message that the recording is finished
 		SetEvent(gTStartComputeEvent);
-
+#endif
 		backbufferIndex++;
 		lastIndex++;
 		lastIndex %= NUM_BACKBUFFERS;
 		backbufferIndex %= NUM_BACKBUFFERS;
+#ifdef MULTI
 	} while(InterlockedCompareExchange(&gThreadsRunning, 0, 0));
+#endif
 
 	return 0;
 }
@@ -1000,18 +1005,20 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 {
 	UNREFERENCED_PARAMETER(_pThreadData);
-	unsigned int backbufferIndex = 0;
+	static unsigned int backbufferIndex = 0;
+#ifdef MULTI
 	do
 	{
+#endif
 		ID3D12CommandAllocator* pCopyAllocator = gTCopyAllocator[backbufferIndex].Get();
 		ID3D12GraphicsCommandList* pCopyList   = gTCopyList[backbufferIndex].Get();
-
+#ifdef MULTI
 		// wait until render is finished
 		WaitForSingleObject(gTWaitCopyEvent, INFINITE);
 
 		// When waiting done, we set this to waiting state
 		ResetEvent(gTWaitCopyEvent);
-
+#endif
 		// Fill copy list
 		{
 			TIF(pCopyAllocator->Reset());
@@ -1044,13 +1051,15 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 			TIF(pCopyList->Close());
 		}
 
+#ifdef MULTI
 		// Message that the recording is finished
 		SetEvent(gTStartCopyEvent);
+#endif
 		backbufferIndex++;
 		backbufferIndex %= NUM_BACKBUFFERS;
-
+#ifdef MULTI
 	} while(InterlockedCompareExchange(&gThreadsRunning, 0, 0));
-
+#endif
 	return 0;
 }
 
