@@ -48,7 +48,7 @@ void bodyBodyInteraction(inout float3 ai, float3 bj, float3 bi, float mass, int 
 										   : SV_DispatchThreadID, uint GIndex
 										   : SV_GroupIndex) {
 	uint index	 = DTid.x;
-	int cubeGroups = g_uiParams.y;
+	uint cubeGroups = g_uiParams.y;
 	float timestep = g_fParams.x;
 
 	DATA current = srv[index];
@@ -74,7 +74,7 @@ void bodyBodyInteraction(inout float3 ai, float3 bj, float3 bi, float mass, int 
 	bodyBodyInteraction(accel, float3(0, 0, 0), pos, centerMass, 1);
 
 	const int tooManyParticles = g_uiParams.y * blocksize - g_uiParams.x;
-	bodyBodyInteraction(accel, float4(0, 0, 0, 0), pos, mass, -tooManyParticles);
+	bodyBodyInteraction(accel, float3(0, 0, 0), pos, mass, -tooManyParticles);
 
 	vel.xyz += accel.xyz * timestep; //deltaTime;
 	vel.xyz *= g_fParams.y; //damping;
