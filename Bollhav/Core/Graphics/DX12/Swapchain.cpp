@@ -4,7 +4,7 @@ Swapchain::Swapchain(ID3D12Device4* _device)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type						= D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	desc.NumDescriptors				= NUM_BACK_BUFFERS;
+	desc.NumDescriptors				= NUM_BACKBUFFERS;
 	desc.Flags						= D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	desc.NodeMask					= 1;
 
@@ -15,7 +15,7 @@ Swapchain::Swapchain(ID3D12Device4* _device)
 		_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_pRTVDescHeap->GetCPUDescriptorHandleForHeapStart();
-	for(UINT i = 0; i < NUM_BACK_BUFFERS; i++)
+	for(UINT i = 0; i < NUM_BACKBUFFERS; i++)
 	{
 		m_RTDescriptor[i] = rtvHandle;
 		rtvHandle.ptr += rtvDescriptorSize;
@@ -33,21 +33,10 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 					 UINT _width,
 					 UINT _height)
 {
-	// Check for multisampling
-	int i = 0;
-	for(i = 4; i > 1; i--)
-	{
-		D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS levels = {DXGI_FORMAT_R8G8B8A8_UNORM, i};
-		if(FAILED(_pDevice->CheckFeatureSupport(
-			   D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &levels, sizeof(levels))))
-			continue;
 
-		if(levels.NumQualityLevels > 0)
-			break;
-	}
 
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
-	sd.BufferCount			 = NUM_BACK_BUFFERS;
+	sd.BufferCount			 = NUM_BACKBUFFERS;
 	sd.Width				 = _width;
 	sd.Height				 = _height;
 	sd.Format				 = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -70,12 +59,12 @@ void Swapchain::Init(ID3D12Device4* _pDevice,
 
 	m_FrameIndex = m_pSwapchain->GetCurrentBackBufferIndex();
 
-	m_pSwapchain->SetMaximumFrameLatency(NUM_BACK_BUFFERS);
+	m_pSwapchain->SetMaximumFrameLatency(NUM_BACKBUFFERS);
 
 	m_hSwapChainWait = m_pSwapchain->GetFrameLatencyWaitableObject();
 	assert(m_hSwapChainWait != nullptr);
 
-	for(UINT i = 0; i < NUM_BACK_BUFFERS; i++)
+	for(UINT i = 0; i < NUM_BACKBUFFERS; i++)
 	{
 		TIF(m_pSwapchain->GetBuffer(i, IID_PPV_ARGS(&m_pRenderTarget[i])));
 		_pDevice->CreateRenderTargetView(m_pRenderTarget[i].Get(), nullptr, m_RTDescriptor[i]);

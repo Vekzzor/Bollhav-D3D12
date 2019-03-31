@@ -11,8 +11,9 @@ using namespace DirectX;
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-constexpr int NUM_BACKBUFFERS = 3;
+constexpr int NUM_BACKBUFFERS = 2;
 
+#include <pix3.h>
 #include <wrl.h>
 using namespace Microsoft::WRL;
 
@@ -26,12 +27,14 @@ using namespace Microsoft::WRL;
 #include <windows.h>
 
 // Utility
+#include "Utility/D3D12Timer.h"
 #include <assert.h>
 #include <comdef.h>
 #include <functional> // For std::function
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 // ImGui
 #include <Utility/imgui.h>

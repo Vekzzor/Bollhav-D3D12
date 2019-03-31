@@ -30,10 +30,10 @@ void VertexBuffer::Create(ID3D12Device4* _pDevice, VERTEX_BUFFER_DESC* _pDesc)
 	TIF(_pDevice->CreateCommittedResource(&heapProp,
 										  D3D12_HEAP_FLAG_NONE,
 										  &desc,
-										  D3D12_RESOURCE_STATE_GENERIC_READ,
+										  D3D12_RESOURCE_STATE_COMMON,
 										  nullptr,
 										  IID_PPV_ARGS(&m_pVertexData)));
-
+	NAME_D3D12_OBJECT(m_pVertexData);
 	//Just something to hold the data for transfer to the GPU.
 	m_vbData.pData	  = m_pVertexData.Get();
 	m_vbData.RowPitch   = sizeof(m_pVertexData);

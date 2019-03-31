@@ -164,6 +164,7 @@
     <ClCompile Include="Core\Window\VideoMode.cpp" />
     <ClCompile Include="Core\Window\Window.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Utility\D3D12Timer.cpp" />
     <ClCompile Include="Utility\ObjLoader.cpp" />
     <ClCompile Include="Core\Render\Renderer.cpp" />
     <ClCompile Include="pch.cpp" />
@@ -193,6 +194,7 @@
     <ClInclude Include="Core\Input\Input.h" />
     <ClInclude Include="Core\Window\VideoMode.h" />
     <ClInclude Include="Core\Window\Window.h" />
+    <ClInclude Include="Utility\D3D12Timer.h" />
     <ClInclude Include="Utility\d3dx12.h" />
     <ClInclude Include="Utility\ObjLoader.h" />
     <ClInclude Include="Core\Render\Renderer.h" />
@@ -291,9 +293,16 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ClassDiagram.cd" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\WinPixEventRuntime.1.0.181206001\build\WinPixEventRuntime.targets" Condition="Exists('..\packages\WinPixEventRuntime.1.0.181206001\build\WinPixEventRuntime.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\WinPixEventRuntime.1.0.181206001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\WinPixEventRuntime.1.0.181206001\build\WinPixEventRuntime.targets'))" />
+  </Target>
 </Project>

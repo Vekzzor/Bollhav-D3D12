@@ -6,7 +6,7 @@ FrameManager::FrameManager(ID3D12Device4* _pDevice)
 {
 	for(int i = 0; i < NUM_BACKBUFFERS; i++)
 		m_Frames[i] = Frame(_pDevice);
-	TIF(_pDevice->CreateFence(m_iFrameIndex, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
+	TIF(_pDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_pFence)));
 	m_hFenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
 
@@ -54,4 +54,9 @@ void FrameManager::SyncCommandQueue(Frame* _pFrame, ID3D12CommandQueue* _pQueue)
 	TIF(_pQueue->Signal(m_pFence.Get(), fenceValue));
 	m_fenceLastSignaledValue = fenceValue;
 	_pFrame->SetFenceValue(fenceValue);
+}
+
+ID3D12Fence* FrameManager::GetFencePtr()
+{
+	return m_pFence.Get();
 }
