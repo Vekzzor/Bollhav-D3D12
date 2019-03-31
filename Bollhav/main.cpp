@@ -94,6 +94,7 @@ constexpr UINT gThreadPerBackBuffer = NUM_BACKBUFFERS;
 constexpr UINT blockSize	  = 128;
 constexpr UINT gTotalNumCubes = blockSize * blockSize * 3;
 constexpr UINT gCopySize		  = blockSize / 2;
+UINT gCopiedData[NUM_BACKBUFFERS] = {};
 //volatile ULONG gNumCubesCount[gThreadPerBackBuffer];
 
 struct DATA
@@ -126,7 +127,7 @@ enum ROOT_TABLE : unsigned char
 struct CBData
 {
 	volatile ULONG numCubes = 0;
-	UINT numBlocks			= 1;
+	UINT numBlocks			= 0;
 
 	float dt		 = 0.001f * 0.1f;
 	float damping	= 1.0f;
@@ -352,7 +353,7 @@ int main(int, char**)
 
 	//fm.SyncCommandQueue(currentFrame, CommandQueue.GetCommandQueue());
 
-	static float m_particleGenTimer							   = 0;
+	static float m_particleGenTimer[NUM_BACKBUFFERS]				   = {};
 	const double UPDATE_TIME								   = 1.0 / 60.0;
 	static float dt											   = 1 / 60;
 	
@@ -375,7 +376,7 @@ int main(int, char**)
 
 	cl->Close();
 
-	UINT cbIndex = 0;
+	//UINT cbIndex = 0;
 	constexpr UINT savedDt = 5;
 	static UINT dtCounter	= 0;
 	static float sumOfDt;
@@ -384,7 +385,8 @@ int main(int, char**)
 	while(Input::IsKeyPressed(VK_ESCAPE) == false && window.isOpen())
 	{
 		vRam = VRamUsage();
-		m_particleGenTimer += dt;
+		const UINT frameIndex = (fm.m_fenceLastSignaledValue + 1) % NUM_BACKBUFFERS;
+		m_particleGenTimer[frameIndex] += dt;
 		window.pollEvents();
 
 		// Start the Dear ImGui frame
@@ -439,22 +441,17 @@ int main(int, char**)
 			camera.move(camMovement);
 			camera.update(deltaTime);
 		}
-		const UINT frameIndex = (fm.m_fenceLastSignaledValue + 1) % NUM_BACKBUFFERS;
 		
-		cbData[frameIndex].dt = smoothDeltaTime / 10;
-		cbData[cbIndex].dt = smoothDeltaTime / 10;
-		if(m_particleGenTimer > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
+		cbData[frameIndex].dt = dt / 10;
+		if(m_particleGenTimer[frameIndex] > particleInterval && cbData[frameIndex].numCubes < gTotalNumCubes)
 		{
-			m_time += m_particleGenTimer;
+			m_time += m_particleGenTimer[frameIndex];
 			//lastFrameIndexHit			 = frameIndex;
 			//cbData[frameIndex].numCubes /*= gNumCubesCount[frameIndex]*/ += 128;
 			//cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
-			cbData[cbIndex].numCubes += 128;
-			cbData[cbIndex].numBlocks = ceil(cbData[cbIndex].numCubes / 128);
-			m_particleGenTimer -= particleInterval;
-
-			cbIndex++;
-			cbIndex = cbIndex % NUM_BACKBUFFERS;
+			cbData[frameIndex].numCubes += 128;
+			cbData[frameIndex].numBlocks = ceil(cbData[frameIndex].numCubes / 128);
+			m_particleGenTimer[frameIndex] -= particleInterval;
 
 			/*		particleAmount								 = cbData[frameIndex].numCubes;
 			perfData[perfDataIndex].currentTime			 = m_time;
@@ -466,6 +463,8 @@ int main(int, char**)
 		}
 
 		// Start Copy Thread
+		//if(gCopiedData[frameIndex] < gTotalNumCubes)
+		{
 		SetEvent(gTWaitCopyEvent);
 
 		// Wait until command recording is done.
@@ -477,6 +476,7 @@ int main(int, char**)
 		gTCopyQueue->ExecuteCommandLists(ARRAYSIZE(CLists), CLists);
 		UINT64 copyFenceValue = ++gTCopyFenceValue;
 		gTCopyQueue->Signal(gTCopyFence.Get(), copyFenceValue);
+		}
 
 #if MULTITHREAD == 0
 		ComputeThreadProc(nullptr);
@@ -1143,7 +1143,6 @@ DWORD WINAPI ComputeThreadProc(LPVOID _pThreadData)
 
 DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 {
-	UINT copiedData										   = 0;
 
 	#if MULTITHREAD == 1
 	UINT threadID = *reinterpret_cast<UINT*>(_pThreadData);
@@ -1168,11 +1167,11 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 			TIF(pCopyList->Reset(pCopyAllocator, nullptr));
 			// Do the copying!
 			
-			if(copiedData < gTotalNumCubes)
+			if(gCopiedData[backbufferIndex] < gTotalNumCubes)
 			{
 				UINT dataSizeInBytes = sizeof(DATA) * blockSize;
 				// TODO(Henrik): fixa numcubes
-				UINT64 inArrayOffset = (copiedData) * sizeof(DATA);
+				UINT64 inArrayOffset = (gCopiedData[backbufferIndex]) * sizeof(DATA);
 
 				BYTE* pData;
 				TIF(gTCopyUpload->Map(0, nullptr, reinterpret_cast<LPVOID*>(&pData)));
@@ -1189,7 +1188,7 @@ DWORD WINAPI CopyThreadProc(LPVOID _pThreadData)
 										0,
 										dataSizeInBytes);
 
-				copiedData += blockSize;
+				gCopiedData[backbufferIndex] += blockSize;
 			}
 			TIF(pCopyList->Close());
 		}
