@@ -1,2 +1,2 @@
-Index	Time Elapsed(ms)	Particle Count	Dispatch Duration(ms)	Draw Duration(ms)	Frame Time(ms)	VRAM Usage(MB)	79.5313
+Index	Time Elapsed(ms)	Particle Count	Dispatch Duration(ms)	Draw Duration(ms)	Frame Time(ms)	VRAM Usage(MB)	81.4688
 0	0	128	0	0	0	
